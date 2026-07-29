@@ -20,14 +20,21 @@ sean. La grilla de evaluación es:
 **El pivot a restaurantes/hoteles no aparece en ningún criterio.** Se responde
 en el informe (Sección 8, semana 3), no reescribiendo la app.
 
-### Dos bloqueantes que anulan el resto
+### Los dos bloqueantes — RESUELTOS el 28/07
 
-1. **No hay repositorio git.** La consigna: *"Un repositorio vacío, privado, o
-   con un solo commit el día de la entrega no aprueba."*
-2. **La app no está publicada.** *"Sin links válidos y funcionales al momento
-   de la corrección, la entrega no se aprueba."*
+| Recurso | URL |
+|---|---|
+| Repositorio (público, 16 commits) | https://github.com/pablomonsalvo76/despensa-inteligente |
+| Aplicación en vivo (HTTPS) | https://pablomonsalvo76.github.io/despensa-inteligente/ |
 
-Mientras estos dos estén abiertos, todo lo demás vale cero. Van primero.
+Verificado: la app carga completa y **sin un solo error de consola**, con
+*Enforce HTTPS* activo — que es lo que la cámara necesita para funcionar.
+
+**Estas dos URLs van en la primera página del informe.** Falta el link al
+video de demo (opcional).
+
+> Recordatorio: los 16 commits están fechados el 28/07. Lo que construye la
+> historia real es commitear cada avance de acá al 17/08.
 
 ---
 

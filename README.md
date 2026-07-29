@@ -1,141 +1,189 @@
-# Despensa Inteligente — implementación funcional
+# Despensa Inteligente
 
-Esta carpeta contiene una app móvil (PWA) que implementa el diseño conceptual
-del trabajo de medio ciclo "Despensa Inteligente: gestión agéntica de
-inventario doméstico y prevención de desperdicio de alimentos".
+App móvil (PWA) de gestión de despensa y prevención de desperdicio de
+alimentos, con orquestación agéntica y memoria persistente.
+
+Implementa el diseño conceptual del trabajo de medio ciclo *"Despensa
+Inteligente: gestión agéntica de inventario doméstico y prevención de
+desperdicio de alimentos"* — Inteligencia Artificial Aplicada a
+Organizaciones, UTN FRBA.
+
+**App en vivo:** https://pablomonsalvo76.github.io/despensa-inteligente/
+
+> Abrila desde el celular para usar la cámara. Se puede instalar con
+> *"Agregar a pantalla de inicio"* y queda como una app más.
+
+---
+
+## El problema
+
+En un hogar se tira comida por dos razones que no son la falta de ganas:
+no se sabe qué hay, y no se sabe qué está por vencer. Cuando uno se
+entera, ya es tarde.
+
+La app ataca eso con un ciclo cerrado: **compra → despensa → consumo →
+compra**. Registra lo que entra, vigila los vencimientos, propone qué
+cocinar priorizando lo que está por vencerse, aprende de lo que hacés y
+te dice qué comprar — y qué **no** comprar, porque comprar de más es una
+de las causas del problema.
+
+---
 
 ## Cómo probarla
 
-**En el celular (recomendado, para usar cámara real):**
+**En el celular** — https://pablomonsalvo76.github.io/despensa-inteligente/
 
-1. Necesitás servirla por HTTPS o `localhost` — los navegadores bloquean el
-   acceso a la cámara (`getUserMedia`) en `file://` o HTTP simple.
-2. Opción rápida: subí la carpeta a [Netlify Drop](https://app.netlify.com/drop)
-   (arrastrar y soltar, sin cuenta) o a GitHub Pages. Te da una URL HTTPS.
-3. Abrí esa URL desde Chrome/Safari en el celular. Podés "Agregar a pantalla
-   de inicio" para que se comporte como app instalada (PWA).
+La cámara necesita HTTPS sí o sí: los navegadores bloquean `getUserMedia`
+sobre `file://` o HTTP simple.
 
-**En la compu, para revisar rápido sin cámara:**
+**En la computadora**, para revisar rápido:
 
 ```bash
-cd despensa-inteligente
 python3 -m http.server 8080
 ```
 
-Abrí `http://localhost:8080`. La cámara funciona en `localhost` incluso sin
-HTTPS. El ingreso manual y el chatbot funcionan siempre.
+Abrí `http://localhost:8080`. La cámara funciona en `localhost` aunque no
+haya HTTPS. El ingreso manual y el chatbot funcionan siempre.
 
-## Qué es real y qué es simulado
+**Con generación de recetas por IA local** (opcional): doble click en
+`probar-ollama.bat`. Levanta Ollama con el permiso de origen que el
+navegador necesita y deja el modelo listo. Requiere abrir la app desde
+`http://localhost` — una página servida por HTTPS no puede llamar a
+localhost.
+
+---
+
+## Arquitectura de agentes
+
+Doce agentes, cada uno en su archivo, coordinados por un orquestador que
+corre el ciclo **Observación → Análisis → Planificación → Acción →
+Evaluación → Aprendizaje** (visible en la pestaña *Sistema*).
+
+| Agente | Archivo | Qué decide |
+|---|---|---|
+| Inventario | `js/agents/inventario.js` | Alta, baja y estado de cada producto |
+| Vencimientos | `js/agents/vencimientos.js` | Semáforo de urgencia y umbrales de alerta |
+| Captura | `js/agents/captura.js` | Escaneo de código de barras, OCR de fecha, carga manual |
+| Conversacional | `js/agents/conversacional.js` | Interpreta lenguaje natural del chat |
+| Hogar | `js/agents/hogar.js` | Perfil de los comensales: alergias y condiciones |
+| Cocinero | `js/agents/cocinero.js` | Qué recetas proponer y en qué orden |
+| Generador | `js/agents/generador.js` | Inventa recetas nuevas con un LLM local |
+| Compras | `js/agents/compras.js` | Qué comprar y qué **no** comprar |
+| Evaluador | `js/agents/evaluador.js` | Registra el desenlace de cada decisión |
+| Aprendizaje | `js/agents/aprendizaje.js` | Ajusta umbrales, gustos y estilo desde la conducta |
+| Impacto | `js/agents/impacto.js` | KPIs: rescatado vs. desperdiciado, ahorro estimado |
+| Orquestador | `js/agents/orquestador.js` | Corre el ciclo y comunica a los demás |
+
+La **memoria persistente** vive en `js/db.js` (localStorage, con
+exportar/importar). La base de recetas curadas, en `js/recipes.js`.
+
+---
+
+## Qué es real y qué no
 
 | Función | Estado |
 |---|---|
-| Inventario, semáforo, alertas, historial, log del ciclo | Real, con persistencia en `localStorage` |
-| Ingreso manual | Real |
-| Chatbot en lenguaje natural | Real, basado en reglas/regex (sin API de LLM, según lo definido para esta entrega) |
-| Escaneo de código de barras | Real: usa la cámara (html5-qrcode) y resuelve el GTIN contra **Open Food Facts** (API pública, sin API key) |
-| Foto + OCR de fecha de vencimiento | Real: usa la cámara y **Tesseract.js** (OCR en el navegador) para leer la fecha impresa |
-| Agente Cocinero | Real, con matching por cobertura de ingredientes, urgencia, ingredientes críticos y filtros de alergias/dietas, contra una base local de ~27 recetas |
-| Agente de Aprendizaje | Real: ajusta ingredientes evitados y ritmo de consumo por categoría a partir del historial |
-| Notificaciones push | Notificaciones del navegador (`Notification` API) cuando hay productos críticos; no son push reales de servidor |
-| Orquestador | Implementado como ciclo explícito en JS (Observación→Análisis→Planificación→Acción→Evaluación→Aprendizaje). El documento original prevé resolverlo con un motor tipo n8n en la entrega final; acá se ve la misma lógica de ciclo en la pestaña "Sistema" |
+| Inventario, semáforo, alertas, historial, log del ciclo | Real, con persistencia local |
+| Escaneo de código de barras | Real: cámara + `html5-qrcode`, resuelve el GTIN contra Open Food Facts (API pública, sin API key) |
+| OCR de fecha de vencimiento | Real: cámara + Tesseract.js en el navegador |
+| Recetas del recetario | Real: 27 recetas curadas con instrucciones paso a paso |
+| Generación de recetas nuevas | Real, con LLM local vía Ollama. Opcional: si está apagado, el recetario sigue funcionando |
+| Chatbot | Real, parser por reglas. No entiende lenguaje libre arbitrario |
+| Aprendizaje de gustos y estilo | Real: aprende de lo que cocinás, lo que descartás y lo que declarás |
+| Notificaciones | Del navegador (`Notification` API). No son push de servidor |
 
-## Mapeo diseño → código
+---
 
-Cada agente descripto en la Sección 4 del documento tiene su archivo:
+## Decisiones de diseño que vale la pena mirar
 
-- `js/agents/inventario.js` — Agente de Inventario
-- `js/agents/vencimientos.js` — Agente de Vencimientos (monitor)
-- `js/agents/cocinero.js` — Agente Cocinero
-- `js/agents/evaluador.js` — Agente Evaluador
-- `js/agents/aprendizaje.js` — Agente de Aprendizaje
-- `js/agents/captura.js` — Agente de Captura (manual, escaneo, foto/OCR)
-- `js/agents/conversacional.js` — Agente Conversacional (chatbot)
-- `js/agents/orquestador.js` — Orquestador del ciclo
-- `js/agents/impacto.js` — Métricas de impacto (KPIs de la Sección 2)
+**La seguridad alimentaria no se delega nunca.** Los productos vencidos
+se excluyen del pool de ingredientes: siguen visibles en Alertas para
+descartarlos, pero jamás se ofrecen para cocinar. Las alergias son filtro
+duro, no puntaje.
 
-La memoria persistente (Sección 6) vive en `js/db.js`, y la base de recetas
-(Sección 3) en `js/recipes.js`.
+**El modelo propone, el código veta.** Toda receta generada por el LLM
+pasa por `validar()`, una función pura sin red: sólo puede usar
+ingredientes que estén realmente en la despensa, y los tags que el modelo
+declara sobre sí mismo se descartan y se recalculan desde los
+ingredientes. Si el modelo afirma que una receta con pollo es vegana, no
+le creemos.
 
-## Decisiones de diseño alineadas al problema
+**Ningún criterio secundario puede funcionar como compuerta.** El bonus
+por rescatar el producto más urgente y la afinidad por el estilo aprendido
+están acotados a propósito, para que una receta que rescata varios
+productos en riesgo pueda ganarle a una que sólo usa el más urgente.
 
-El problema que la app resuelve es el desperdicio de alimentos en el hogar,
-causado por falta de visibilidad del inventario y de planificación. Estas
-funciones existen específicamente para atacarlo:
+**El aprendizaje reserva lugar para explorar.** Si el usuario cocina
+italiana tres veces, la afinidad empuja italiana — y como sólo ve
+italiana, nunca genera evidencia de que le guste otra cosa. Un lugar de
+cada lista queda reservado para algo fuera del gusto aprendido.
 
-- **Panel de impacto (Historial).** Traduce el historial en los KPIs de la
-  Sección 2: productos rescatados vs. desperdiciados, tasa de
-  aprovechamiento, % de recetas seguidas y ahorro estimado. Sin esto, la app
-  no le muestra al usuario si está logrando su objetivo.
-- **Editar y eliminar productos.** El documento (Sección 8) identifica la
-  carga incompleta o errónea del inventario como el principal *freno* del
-  sistema: si el inventario miente, todas las decisiones posteriores son
-  malas. Eliminar se distingue de "descartar": eliminar es corregir una
-  carga por error y **no** cuenta como desperdicio en las métricas.
-- **Chatbot con contexto.** Si el agente pregunta "¿cuándo vence?", alcanza
-  con responder la fecha. Reduce la fricción de carga, otro freno declarado.
-- **Cache local de códigos + fecha estimada por categoría.** Un escaneo que
-  falla por falta de red es carga que no se hace. El GTIN resuelto queda
-  memorizado y funciona offline; si el usuario no conoce la fecha, se estima
-  por categoría (Sección 6, "arranque en frío").
-- **Umbrales con control humano.** El Agente de Aprendizaje nunca pisa un
-  umbral que el usuario fijó a mano (`lockedByUser`); sólo ajusta los que
-  nadie fijó, y Preferencias muestra cuál es cuál.
-- **Exportar/importar la memoria.** El aprendizaje acumulado es el activo
-  del sistema; sin backup se pierde al borrar los datos del navegador.
-- **Ranking de recetas por urgencia real.** El Agente Cocinero identifica el
-  producto más próximo a vencer y privilegia las recetas que lo rescatan
-  combinándolo con el resto de la despensa. El peso de urgencia es continuo
-  (`10 / días restantes`), así que algo que vence mañana pesa el doble que
-  algo que vence pasado; no todos los "amarillos" valen igual.
-- **Nunca se cocina con productos vencidos.** La Sección 7 establece que la
-  seguridad alimentaria prevalece sobre todo otro criterio, así que los
-  productos ya vencidos se excluyen del pool de ingredientes disponibles:
-  siguen visibles en Alertas para descartarlos, pero jamás se ofrecen para
-  cocinar.
-- **Paso a paso en cada receta.** Una sugerencia que sólo nombra un plato
-  difícilmente termine en comida cocinada. Las 27 recetas incluyen
-  instrucciones, tiempo, porciones y qué ingredientes faltan.
-- **Descartar una receta la saca del listado.** El descarte es una decisión
-  del usuario que el sistema respeta: la receta deja de sugerirse y puede
-  restaurarse desde Preferencias.
+**El aprendizaje nunca pisa una decisión humana.** Los umbrales que el
+usuario fijó a mano (`lockedByUser`) quedan bajo su control; el agente
+sólo ajusta los que nadie tocó, y Preferencias muestra cuál es cuál.
 
-## Limitaciones conocidas (honestas, para la entrega)
+**Eliminar ≠ descartar.** Eliminar corrige una carga por error y no
+cuenta como desperdicio en las métricas. Si el inventario miente, todas
+las decisiones posteriores son malas.
 
-- La "memoria persistente" es `localStorage` del navegador: vive en el
-  dispositivo, no en un backend compartido entre dispositivos. Se mitiga con
-  exportar/importar, pero para la entrega final pasaría a una base real.
-- El chatbot es un parser por reglas, no un LLM: entiende patrones comunes
-  ("ingresé X, vence el dd/mm/aaaa", "¿qué se me vence?", "¿qué puedo
-  cocinar?") y ahora también respuestas cortas a una pregunta pendiente,
-  pero no lenguaje libre arbitrario.
-- El OCR depende de la nitidez de la foto y de tener conexión para cargar
-  Tesseract.js la primera vez.
-- La resolución de código de barras depende de que el producto esté cargado
-  en Open Food Facts (más cobertura en marcas internacionales que en
-  artículos muy locales); si no lo encuentra, se completa el nombre a mano y
-  queda memorizado para los próximos escaneos.
-- El **ahorro estimado** usa un valor de referencia fijo por producto: es una
+---
+
+## Verificación
+
+Cuatro suites, **112 pruebas**, sin dependencias externas:
+
+```bash
+node tests/fechas.test.js         # 37 — parseo de fechas de envase y OCR
+node tests/recomendacion.test.js  # 16 — ranking de recetas y aprendizaje
+node tests/estilo.test.js         # 19 — aprendizaje de gusto y exploración
+node tests/generacion.test.js     # 40 — veto determinístico sobre el LLM
+```
+
+Los tests se verificaron **por mutación**: se rompió cada control a
+propósito en una copia para confirmar que la suite lo detecta. Un test que
+pasa igual con el código roto no es evidencia de nada. Ese proceso
+encontró dos pruebas que no discriminaban, y se reescribieron.
+
+Todos los archivos JS pasan `node --check`.
+
+---
+
+## Limitaciones conocidas
+
+- La memoria persistente es `localStorage`: vive en el dispositivo, no en
+  un backend compartido. Se mitiga con exportar/importar.
+- El chatbot es un parser por reglas. El LLM local todavía no lo
+  reemplaza: está integrado sólo en la generación de recetas.
+- El OCR depende de la nitidez de la foto y de la resolución que entregue
+  la cámara del dispositivo.
+- El escaneo depende de que el producto esté en Open Food Facts. Si no
+  está, se carga el nombre a mano y queda memorizado.
+- El ahorro estimado usa un valor de referencia por producto: es una
   estimación declarada como tal, no un cálculo con precios reales.
+- La generación con LLM requiere Ollama corriendo localmente y la app
+  abierta desde `localhost` (restricción de *mixed content* del navegador).
 
-## Identidad visual
+---
 
-Dos temas, ambos con el mismo sistema de componentes:
+## Stack
 
-- **Claro:** verde fresco (`#2F8F4E`) como color de marca — alimento vivo y
-  sostenibilidad — con terracota (`#E2662F`) como acento cálido de cocina.
-  Se eligió deliberadamente **no** usar el azul genérico de las apps de
-  billetera virtual, para que la app comunique su dominio.
-- **Oscuro:** negro con amarillo como acento, alto contraste.
+Sin framework, sin build step y sin backend — a propósito: la app se
+instala, funciona offline y ningún dato del usuario sale del dispositivo.
 
-El semáforo de vencimientos (verde / amarillo / rojo / vencido) mantiene su
-significado y legibilidad en los dos temas.
+| Componente | Tecnología |
+|---|---|
+| Frontend | HTML + CSS + JavaScript vanilla (PWA) |
+| Persistencia | `localStorage` con exportar/importar |
+| OCR | Tesseract.js (en el navegador) |
+| Códigos de barras | html5-qrcode + Open Food Facts |
+| IA generativa | Ollama local (opcional) |
+| Orquestación | Código propio, ciclo explícito |
+| Despliegue | GitHub Pages |
 
-## Verificación realizada
+---
 
-Se ejecutó un test funcional (Node, simulando `localStorage`) que valida
-el ciclo completo: alta de productos → análisis de vencimientos →
-sugerencia de recetas → registro de desenlace → ajuste de aprendizaje;
-además de casos del chatbot (fechas ambiguas, cantidades, consultas) y
-reglas de negocio (alergias como filtro duro, exclusión de recetas sin
-ingrediente crítico disponible). Todos los archivos JS pasaron `node
---check` sin errores de sintaxis.
+## Documentación
+
+- [`PLAN_ENTREGA_FINAL.md`](PLAN_ENTREGA_FINAL.md) — plan de trabajo
+- [`INSTALAR_EN_CELULAR.md`](INSTALAR_EN_CELULAR.md) — instalación y APK
+- [`PLAN_MEJORAS.md`](PLAN_MEJORAS.md) — devoluciones e implementación
