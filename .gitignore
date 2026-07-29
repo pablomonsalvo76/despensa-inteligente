@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+
+# Carpeta generada por Capacitor: se rearma con `npm run preparar`.
+# Versionarla mete miles de archivos que no son trabajo propio y ensucian
+# la historia de commits, que es justamente lo que el docente evalúa.
+android-build/www/
+android-build/android/
+android-build/node_modules/
+
+# Salidas de compilación
+*.apk
+*.aab
+*.keystore
+
+# Sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Temporales
+*.log
+*.tmp
