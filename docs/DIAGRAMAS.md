@@ -163,7 +163,7 @@ sequenceDiagram
     actor U as Usuario
     participant UI as Interfaz
     participant CAP as Captura
-    participant OFF as Open Food Facts
+    participant OFACT as Open Food Facts
     participant OCR as Tesseract.js
     participant INV as Inventario
     participant DB as Memoria local
@@ -178,8 +178,8 @@ sequenceDiagram
     alt está cacheado
         DB-->>CAP: nombre y categoría
     else no está
-        CAP->>OFF: GET /product/{gtin}.json
-        OFF-->>CAP: nombre y categoría
+        CAP->>OFACT: GET /product/ + gtin + .json
+        OFACT-->>CAP: nombre y categoría
         CAP->>DB: guarda en gtinCache (sirve offline la próxima)
     end
     CAP-->>UI: producto identificado
