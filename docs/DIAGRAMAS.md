@@ -12,76 +12,59 @@ Muestra cómo fluyen los datos de entrada a salida, **qué componentes son IA
 y cuáles son lógica tradicional**, y dónde vive la memoria persistente.
 
 ```mermaid
-flowchart TB
-    subgraph ENTRADA["ENTRADA — el usuario"]
-        direction LR
-        E1["Cámara<br/>código de barras"]
-        E2["Cámara<br/>foto de la fecha"]
-        E3["Formulario<br/>carga manual"]
-        E4["Chat<br/>lenguaje natural"]
-    end
+flowchart LR
+    E1["Cámara<br/>código de barras"]
+    E2["Cámara<br/>foto de la fecha"]
+    E3["Carga manual<br/>y chat"]
 
-    subgraph IA["COMPONENTES DE IA"]
-        direction LR
-        IA1["Tesseract.js<br/><i>visión / OCR</i><br/>en el navegador"]
-        IA2["LLM local vía Ollama<br/><i>generación</i><br/>en la máquina del usuario"]
-    end
+    IA1{{"Tesseract.js<br/>OCR en el navegador"}}
+    X1[/"Open Food Facts<br/>API pública sin clave"/]
 
-    subgraph LOGICA["LÓGICA TRADICIONAL — 12 agentes en JavaScript"]
-        direction TB
-        L1["Captura<br/>normaliza y valida"]
-        L2["Inventario · Vencimientos<br/>estado y urgencia"]
-        L3["Hogar · Cocinero · Compras<br/>decisión por reglas y puntaje"]
-        L4["Evaluador · Aprendizaje<br/>ajuste desde la conducta"]
-        L5["VETO DETERMINÍSTICO<br/>alergias · vencidos · despensa real"]
-        L0["Orquestador<br/>corre el ciclo"]
-    end
+    L1["<b>Captura</b><br/>normaliza y valida"]
+    L2["<b>Inventario</b> · <b>Vencimientos</b><br/>estado y urgencia"]
+    L3["<b>Hogar</b> · <b>Cocinero</b> · <b>Compras</b><br/>decisión por reglas y puntaje"]
+    L4["<b>Evaluador</b> · <b>Aprendizaje</b><br/>ajuste desde la conducta"]
+    ORQ["<b>Orquestador</b><br/>corre el ciclo"]
 
-    subgraph MEMORIA["MEMORIA PERSISTENTE — js/db.js sobre localStorage"]
-        direction LR
-        M1[("products<br/>history<br/>preferences")]
-        M2[("stylePreferences<br/>consumptionPatterns<br/>household")]
-        M3[("gtinCache<br/>dismissedRecipes<br/>systemLog")]
-    end
+    IA2{{"LLM local vía Ollama<br/>genera recetas nuevas"}}
+    VETO["VETO DETERMINÍSTICO<br/>alergias · vencidos<br/>sólo lo que hay en casa"]
 
-    subgraph EXTERNO["SERVICIO EXTERNO"]
-        X1["Open Food Facts<br/>API pública sin clave"]
-    end
+    DB[("MEMORIA PERSISTENTE<br/>js/db.js sobre localStorage<br/><br/>products · history · preferences<br/>stylePreferences · household<br/>gtinCache · systemLog")]
 
-    SALIDA["SALIDA — interfaz<br/>alertas · recetas · lista de compras · KPIs"]
+    OUT["SALIDA<br/>alertas · recetas<br/>lista de compras · KPIs"]
 
     E1 --> L1
     E2 --> IA1 --> L1
     E3 --> L1
-    E4 --> L1
-    E1 -.consulta GTIN.-> X1 -.nombre y categoría.-> L1
+    E1 -. GTIN .-> X1 -. nombre .-> L1
 
-    L1 --> L2 --> L3
-    L3 --> SALIDA
-    IA2 -.propone receta.-> L5
-    L3 --> IA2
-    L5 --> SALIDA
-    SALIDA --> L4
-    L4 --> MEMORIA
-    L0 -.coordina.-> L2
-    L0 -.coordina.-> L3
-    L0 -.coordina.-> L4
+    L1 --> L2 --> L3 --> OUT
+    L3 --> IA2 --> VETO --> OUT
+    OUT --> L4
+    ORQ -.coordina.-> L2
+    ORQ -.coordina.-> L3
+    ORQ -.coordina.-> L4
 
-    MEMORIA <--> L2
-    MEMORIA <--> L3
-    MEMORIA <--> L4
+    DB <--> L2
+    DB <--> L3
+    DB <--> L4
 
-    classDef ia fill:#e8590c,stroke:#c44,color:#fff
+    classDef ia fill:#e8590c,stroke:#bf360c,color:#fff
     classDef logica fill:#2f8f4e,stroke:#1c5c32,color:#fff
     classDef mem fill:#37474f,stroke:#263238,color:#fff
     classDef ext fill:#5c6bc0,stroke:#3949ab,color:#fff
     classDef veto fill:#b71c1c,stroke:#7f0000,color:#fff
+    classDef io fill:#455a64,stroke:#263238,color:#fff
     class IA1,IA2 ia
-    class L0,L1,L2,L3,L4 logica
-    class L5 veto
-    class M1,M2,M3 mem
+    class L1,L2,L3,L4,ORQ logica
+    class VETO veto
+    class DB mem
     class X1 ext
+    class E1,E2,E3,OUT io
 ```
+
+> **Naranja = IA. Verde = lógica determinística. Rojo = el veto.**
+> Gris oscuro = memoria persistente. Azul = servicio externo.
 
 **Lo que hay que leer en este diagrama:**
 
@@ -239,12 +222,12 @@ sequenceDiagram
 ## 4 · UML — Casos de uso
 
 ```mermaid
-flowchart TB
+flowchart LR
     U(("Usuario<br/>del hogar"))
     C(("Comensal<br/>alergias y<br/>condiciones"))
     S(("Sistema<br/>agéntico"))
 
-    subgraph APP[" "]
+    subgraph APP["Despensa Inteligente"]
         UC1["Cargar producto<br/>escaneo · foto · manual · chat"]
         UC2["Consultar qué vence"]
         UC3["Recibir sugerencias<br/>de recetas"]
