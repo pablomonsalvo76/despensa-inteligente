@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Despensa Inteligente</title>
+<meta name="theme-color" content="#2f8f4e" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/styles.css" />
+<script>
+  // Aplica el tema guardado antes de pintar, para evitar el "flash" del tema
+  // por defecto al recargar. Soporta claro / oscuro / según el sistema.
+  (function () {
+    var g = localStorage.getItem('despensa_inteligente_v1::theme') || 'sistema';
+    var oscuro = g === 'dark' || (g === 'sistema' &&
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
+  })();
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ==================== 1. SPLASH ==================== -->
+  <div class="splash" id="splash">
+    <div class="splash-inner">
+      <div class="splash-logo" id="splash-logo"></div>
+      <h1 class="splash-title">Despensa<br><span>Inteligente</span></h1>
+      <p class="splash-tagline">Organizá lo que tenés.<br>Ahorrá dinero. Disfrutá más.</p>
+      <button class="btn btn-primary btn-block splash-btn" id="splash-start">Comenzar</button>
+    </div>
+    <div class="splash-leaves" aria-hidden="true"></div>
+  </div>
+
+  <!-- ==================== 2. ONBOARDING ==================== -->
+  <div class="onboarding" id="onboarding" hidden>
+    <button class="onb-skip" id="onb-skip">Omitir</button>
+    <div class="onb-art" id="onb-art"></div>
+    <h2 class="onb-title" id="onb-title"></h2>
+    <p class="onb-text" id="onb-text"></p>
+    <div class="onb-footer">
+      <div class="onb-dots" id="onb-dots"></div>
+      <button class="onb-next" id="onb-next" aria-label="Siguiente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== APP PRINCIPAL ==================== -->
+  <div class="shell" id="shell" hidden>
+
+    <!-- Header contextual: cambia según la pantalla -->
+    <header class="app-header" id="app-header">
+      <button class="hdr-btn" id="hdr-back" hidden aria-label="Volver">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="hdr-titles">
+        <h1 id="hdr-title">Inicio</h1>
+        <p class="hdr-sub" id="hdr-sub"></p>
+      </div>
+      <button class="hdr-btn" id="hdr-search" hidden aria-label="Buscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button class="hdr-btn" id="hdr-bell" aria-label="Alertas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4C4.5 13.5 6 12 6 8Z"/><path d="M9.5 18a2.5 2.5 0 0 0 5 0"/></svg>
+        <span class="hdr-badge" id="hdr-badge" hidden></span>
+      </button>
+    </header>
+
+    <main class="view" id="view">
+
+      <!-- ============ 3. INICIO / DASHBOARD ============ -->
+      <section class="screen active" id="sc-inicio">
+        <div class="greeting">
+          <h2 id="greet-name">¡Hola! 👋</h2>
+          <p>Este es el estado de tu despensa</p>
+        </div>
+
+        <button class="feature-card feature-card--warn" id="card-vencer">
+          <div class="fc-body">
+            <span class="fc-label">Próximos a vencer</span>
+            <span class="fc-value" id="fc-vencer-n">0 productos</span>
+            <span class="fc-note">en los próximos <b id="fc-vencer-dias">7</b> días</span>
+            <span class="fc-cta">Ver alertas</span>
+          </div>
+          <div class="fc-art" id="fc-vencer-art"></div>
+        </button>
+
+        <button class="feature-card feature-card--ok" id="card-recetas">
+          <div class="fc-body">
+            <span class="fc-label">Recetas para vos</span>
+            <span class="fc-value" id="fc-recetas-n">0 recetas</span>
+            <span class="fc-note">con lo que tenés</span>
+            <span class="fc-cta">Ver recetas</span>
+          </div>
+          <div class="fc-art" id="fc-recetas-art"></div>
+        </button>
+
+        <div class="section-title">Resumen de tu despensa</div>
+        <div class="cat-summary" id="cat-summary"></div>
+
+        <div class="section-title">Actividad del sistema</div>
+        <div class="card cycle-mini" id="cycle-mini"></div>
+      </section>
+
+      <!-- ============ 4. MIS PRODUCTOS ============ -->
+      <section class="screen" id="sc-productos">
+        <div class="searchbar" id="searchbar" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="text" id="prod-search" placeholder="Buscar producto..." />
+        </div>
+        <div class="chips-row" id="prod-filters"></div>
+        <div id="productos-list"></div>
+        <button class="btn btn-primary btn-block" id="btn-add-inline" style="margin-top:14px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:17px;height:17px"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar producto
+        </button>
+      </section>
+
+      <!-- ============ 5. AGREGAR PRODUCTO ============ -->
+      <section class="screen" id="sc-agregar">
+        <div class="capture-grid capture-grid--3">
+          <button class="capture-btn" data-method="auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M3 12h18"/></svg>
+            Escáner
+          </button>
+          <button class="capture-btn" data-method="scan">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="1.7" height="14"/><rect x="6.3" y="5" width="1" height="14"/><rect x="8.8" y="5" width="2.1" height="14"/><rect x="12.4" y="5" width="1" height="14"/><rect x="14.9" y="5" width="1.7" height="14"/><rect x="18" y="5" width="1" height="14"/><rect x="20.4" y="5" width="1" height="14"/></svg>
+            Sólo código
+          </button>
+          <button class="capture-btn" data-method="photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.2"/></svg>
+            Foto fecha
+          </button>
+        </div>
+
+        <!-- Modo escáner: lee código y fecha en una sola pasada -->
+        <div class="capture-panel" id="panel-auto" hidden>
+          <!-- Instrucción única y grande: en cada momento el usuario tiene
+               que saber a QUÉ está apuntando, sin leer un párrafo. -->
+          <div class="scan-banner" id="auto-banner" aria-live="polite">
+            <span class="sb-paso" id="auto-paso">Paso 1 de 2</span>
+            <strong class="sb-accion" id="auto-accion">Apuntá al código de barras</strong>
+          </div>
+          <div class="scan-stage">
+            <div id="auto-reader"></div>
+            <div class="scan-frame" aria-hidden="true"></div>
+          </div>
+          <div class="scan-steps">
+            <div class="scan-step" id="step-codigo">
+              <span class="ss-dot"></span>
+              <span class="ss-txt">Código de barras</span>
+              <span class="ss-val">buscando…</span>
+            </div>
+            <div class="scan-step" id="step-nombre">
+              <span class="ss-dot"></span>
+              <span class="ss-txt">Nombre del producto</span>
+              <span class="ss-val">en espera</span>
+            </div>
+            <div class="scan-step" id="step-fecha">
+              <span class="ss-dot"></span>
+              <span class="ss-txt">Fecha de vencimiento</span>
+              <span class="ss-val">en espera</span>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn btn-primary" id="auto-start">Iniciar escáner</button>
+            <button class="btn btn-outline" id="auto-stop" hidden>Detener</button>
+          </div>
+          <p class="hint-text" id="auto-status"></p>
+        </div>
+
+        <!-- Panel de escaneo (sólo código de barras) -->
+        <div class="capture-panel" id="panel-scan" hidden>
+          <video id="camera-preview" autoplay playsinline muted></video>
+          <div class="form-row">
+            <label>Código de barras (EAN-13/UPC)</label>
+            <input type="text" id="s-barcode" placeholder="Ej: 7790070073830" />
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-outline" id="s-start-camera">Activar cámara</button>
+            <button class="btn btn-secondary" id="s-lookup">Buscar producto</button>
+          </div>
+          <p class="hint-text" id="s-origen"></p>
+        </div>
+
+        <!-- Panel de foto + OCR -->
+        <div class="capture-panel" id="panel-photo" hidden>
+          <video id="camera-preview-photo" autoplay playsinline muted></video>
+          <canvas id="photo-canvas" hidden></canvas>
+          <div class="btn-row">
+            <button class="btn btn-outline" id="p-start-camera">Activar cámara</button>
+            <button class="btn btn-secondary" id="p-capture" disabled>Capturar</button>
+          </div>
+          <input type="file" id="p-file" accept="image/*" capture="environment" />
+          <p class="hint-text" id="p-ocr-status"></p>
+          <div class="ocr-raw" id="p-ocr-raw" hidden></div>
+          <p class="hint-text" style="text-align:left">
+            Para la <strong>fecha</strong>: que ocupe casi toda la foto, enfocada y con luz pareja.
+            Para el <strong>nombre</strong>: sacá el frente del envase completo.
+          </p>
+        </div>
+
+        <!-- Formulario común: lo alimentan las tres vías de captura -->
+        <div class="form-row">
+          <label>Nombre del producto</label>
+          <input type="text" id="f-name" placeholder="Ej. Leche Entera" />
+        </div>
+        <div class="form-row">
+          <label>Categoría</label>
+          <select id="f-category">
+            <option value="">Seleccionar categoría</option>
+            <option value="lacteos">Lácteos</option>
+            <option value="verduras">Verduras</option>
+            <option value="frutas">Frutas</option>
+            <option value="carnes">Carnes</option>
+            <option value="cereales">Granos y cereales</option>
+            <option value="huevos">Huevos</option>
+            <option value="conservas">Conservas</option>
+            <option value="bebidas">Bebidas</option>
+            <option value="otros">Otros</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Fecha de vencimiento</label>
+          <input type="date" id="f-expiry" />
+          <button class="btn-link" id="f-estimar">No la sé — estimar por categoría</button>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label>Cantidad</label>
+            <input type="number" id="f-quantity" value="1" min="1" />
+          </div>
+          <div class="form-row">
+            <label>Ubicación</label>
+            <select id="f-location">
+              <option value="Heladera">Heladera</option>
+              <option value="Freezer">Freezer</option>
+              <option value="Alacena">Alacena</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="f-save">Guardar producto</button>
+
+        <!-- Consumo desde edición: sin esto, consumir un producto "verde" no
+             tiene registro y el Aprendizaje pierde esas muestras. -->
+        <div class="consume-row" id="f-consume-row" hidden>
+          <div class="form-row" style="flex:0 0 92px;margin-bottom:0">
+            <label>Cantidad</label>
+            <input type="number" id="f-consume-qty" min="1" value="1" />
+          </div>
+          <button class="btn btn-secondary" id="f-consume" style="flex:1">Lo consumí</button>
+        </div>
+
+        <button class="btn btn-danger btn-block" id="f-delete" hidden style="margin-top:8px">Eliminar del inventario</button>
+        <p class="hint-text" id="f-delete-note" hidden>Eliminar es para cargas por error: no cuenta como desperdicio. Si se echó a perder, usá "Descartado" en Alertas.</p>
+      </section>
+
+      <!-- ============ 6. ALERTAS ============ -->
+      <section class="screen" id="sc-alertas">
+        <div class="tabs" id="alert-tabs">
+          <button class="tab active" data-alert-tab="proximos">Próximos a vencer</button>
+          <button class="tab" data-alert-tab="vencidos">Vencidos</button>
+        </div>
+        <div id="alertas-list"></div>
+        <div class="tip-card" id="tip-card">
+          <div class="tip-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c0-6 4-9 9-9 0 6-4 9-9 9Z"/><path d="M12 21c0-5-3-8-8-8 0 5 3 8 8 8Z"/><path d="M12 21v-4"/></svg>
+          </div>
+          <div>
+            <strong>Consejo</strong>
+            <p id="tip-text">Consumí primero los productos que están por vencer para evitar desperdicios.</p>
+          </div>
+          <button class="tip-close" id="tip-close" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ============ 7. RECETAS PARA VOS ============ -->
+      <section class="screen" id="sc-recetas">
+        <div class="suggest-banner suggest-banner--danger" id="recetas-banner" hidden>
+          <span id="recetas-banner-text"></span>
+        </div>
+        <div class="row-head"><h3>Con lo que tenés</h3></div>
+        <div id="recetas-destacada"></div>
+        <div class="row-head"><h3>Otras ideas</h3></div>
+        <div id="recetas-otras"></div>
+        <p class="hint-text">Tu respuesta ajusta las próximas sugerencias (Agente de Aprendizaje).</p>
+
+        <div class="row-head"><h3>Inventar una receta</h3></div>
+        <div class="card">
+          <button class="btn btn-outline btn-block" id="gen-crear">Crear una receta nueva con lo que tengo</button>
+          <div id="gen-estado"></div>
+          <div id="gen-resultado"></div>
+          <p class="hint-text" style="text-align:left">Las recetas inventadas por el modelo pasan por los mismos controles que las del recetario: no pueden usar nada que no tengas, nada vencido, ni nada que choque con una alergia o una pauta del hogar.</p>
+        </div>
+      </section>
+
+      <!-- ============ 8. DETALLE DE RECETA ============ -->
+      <section class="screen screen--flush" id="sc-receta">
+        <div class="recipe-hero" id="rd-hero"></div>
+        <div class="recipe-detail-body">
+          <h2 id="rd-name"></h2>
+          <div class="rd-meta" id="rd-meta"></div>
+          <div class="rd-rescue" id="rd-rescue" hidden></div>
+          <div class="rd-avisos" id="rd-avisos"></div>
+          <div class="tabs" id="rd-tabs">
+            <button class="tab active" data-rd-tab="ingredientes">Ingredientes</button>
+            <button class="tab" data-rd-tab="preparacion">Preparación</button>
+          </div>
+          <div id="rd-ingredientes"></div>
+          <ol id="rd-preparacion" class="recipe-steps" hidden></ol>
+          <!-- Recursos externos: video de la receta y más ideas con el
+               ingrediente urgente. Son búsquedas (nunca dan 404); el filtro
+               de elgourmet no admite parámetros por URL, por eso se llega
+               vía búsqueda acotada al sitio. -->
+          <div class="rd-links">
+            <a id="rd-youtube" href="#" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.8 2.8 0 0 0-1.9-2C17.9 4.7 12 4.7 12 4.7s-5.9 0-7.7.5a2.8 2.8 0 0 0-1.9 2A29 29 0 0 0 2 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 1.9 2c1.8.5 7.7.5 7.7.5s5.9 0 7.7-.5a2.8 2.8 0 0 0 1.9-2A29 29 0 0 0 22 12a29 29 0 0 0-.4-4.8ZM10 15.2V8.8L15.5 12 10 15.2Z"/></svg>
+              Ver video en YouTube
+            </a>
+            <a id="rd-elgourmet" href="#" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 4 0V2"/><path d="M9 9v13"/><path d="M17 2c-1.7 0-3 2.2-3 5s1.3 5 3 5v10"/></svg>
+              <span id="rd-elgourmet-txt">Más recetas en elGourmet</span>
+            </a>
+          </div>
+
+          <div class="rd-actions">
+            <button class="btn btn-primary" id="rd-cook">Cociné</button>
+            <button class="btn btn-outline" id="rd-dismiss">Descartar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 9. CALENDARIO ============ -->
+      <section class="screen" id="sc-calendario">
+        <div class="card cal-card">
+          <div class="cal-head">
+            <button class="cal-nav" id="cal-prev" aria-label="Mes anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <strong id="cal-title"></strong>
+            <button class="cal-nav" id="cal-next" aria-label="Mes siguiente">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="cal-dow"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <div class="section-title">Próximos vencimientos</div>
+        <div id="cal-list"></div>
+      </section>
+
+      <!-- ============ 10. ESTADÍSTICAS ============ -->
+      <section class="screen" id="sc-estadisticas">
+        <div class="tabs tabs--pill" id="stat-tabs">
+          <button class="tab active" data-stat-range="mes">Mes</button>
+          <button class="tab" data-stat-range="ano">Año</button>
+        </div>
+
+        <div class="stat-card stat-card--hero">
+          <span class="stat-label">Ahorro estimado</span>
+          <span class="stat-value" id="stat-ahorro">$0</span>
+          <span class="stat-sub" id="stat-ahorro-sub"></span>
+          <div class="spark" id="stat-spark"></div>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Productos rescatados</span>
+          <span class="stat-value" id="stat-rescatados">0</span>
+          <span class="stat-sub" id="stat-rescatados-sub"></span>
+        </div>
+
+        <div class="section-title">Aprovechamiento</div>
+        <div class="card">
+          <div class="impact-bar"><div class="impact-bar-fill" id="stat-bar"></div></div>
+          <p class="hint-text" id="stat-resumen" style="text-align:left;margin-top:10px"></p>
+        </div>
+
+        <div class="section-title">Categorías más usadas</div>
+        <div class="card donut-card">
+          <div class="donut" id="stat-donut"></div>
+          <div class="donut-legend" id="stat-legend"></div>
+        </div>
+      </section>
+
+      <!-- ============ 11. PERFIL ============ -->
+      <section class="screen" id="sc-perfil">
+        <div class="profile-head">
+          <div class="avatar" id="profile-avatar"></div>
+          <div>
+            <strong id="profile-name">Invitado</strong>
+            <p id="profile-email">Sin correo configurado</p>
+          </div>
+        </div>
+
+        <div class="menu-list">
+          <button class="menu-row" data-go="sc-mis-datos">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></span>
+            Mi información
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-hogar">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M17 14c2.4 0 4 1.6 4 4"/></svg></span>
+            Mi hogar · quiénes comen
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-compras">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h15l-1.4 11a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8L5 7Z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/><path d="M3 7h2"/></svg></span>
+            Lista de compras
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-preferencias">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h4M12 12h8M4 18h13M21 18h0"/><circle cx="15" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="19" cy="18" r="2.2"/></svg></span>
+            Preferencias y restricciones
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-estadisticas">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+            Estadísticas de impacto
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-calendario">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></span>
+            Calendario de vencimientos
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-historial">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>
+            Historial y aprendizaje
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-sistema">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.9-3.5M4 13a8 8 0 0 0 14.9 3.5"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></span>
+            Sistema · ciclo de agentes
+            <span class="mr-arrow">›</span>
+          </button>
+          <button class="menu-row" data-go="sc-config">
+            <span class="mr-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7"/></svg></span>
+            Configuración
+            <span class="mr-arrow">›</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ============ HOGAR · quiénes comen acá ============ -->
+      <section class="screen" id="sc-hogar">
+        <p class="hint-text" style="text-align:left;margin-top:0">
+          El agente cocina <strong>para la mesa</strong>, no sólo para vos. Cargá a quienes comen en casa:
+          sus alergias y condiciones se aplican como filtro a todas las sugerencias.
+        </p>
+        <div id="hogar-lista"></div>
+        <button class="btn btn-primary btn-block" id="hogar-nuevo" style="margin-top:12px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:17px;height:17px"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar comensal
+        </button>
+
+        <div class="card disclaimer">
+          <strong>Sobre las condiciones médicas</strong>
+          <p>La app las usa como filtro de sentido común (por ejemplo, no sugerir gluten si hay una persona celíaca) y para advertirte. No reemplaza la indicación de un profesional de la salud.</p>
+        </div>
+      </section>
+
+      <!-- ============ EDITAR COMENSAL ============ -->
+      <section class="screen" id="sc-comensal">
+        <input type="hidden" id="cm-id" />
+        <div class="card">
+          <div class="form-row">
+            <label>Nombre</label>
+            <input type="text" id="cm-nombre" placeholder="Ej. Sofía" />
+          </div>
+          <div class="form-row">
+            <label>Alergias (separadas por coma)</label>
+            <input type="text" id="cm-alergias" placeholder="ej: maní, frutos secos" />
+            <button class="btn-link" style="cursor:default;text-decoration:none">Se aplican como filtro duro: nunca se sugiere una receta que las contenga.</button>
+          </div>
+          <div class="form-row">
+            <label>Condiciones médicas</label>
+            <div class="checkbox-row" id="cm-condiciones"></div>
+          </div>
+          <div class="form-row">
+            <label>Pautas alimentarias</label>
+            <div class="checkbox-row" id="cm-dietas"></div>
+          </div>
+          <div class="form-row">
+            <label>Le gusta (separado por coma)</label>
+            <input type="text" id="cm-gusta" placeholder="ej: pollo, arroz" />
+          </div>
+          <div class="form-row">
+            <label>No le gusta</label>
+            <input type="text" id="cm-nogusta" placeholder="ej: zapallo, apio" />
+          </div>
+          <div class="form-row">
+            <label>Notas (historia, preferencias, lo que quieras)</label>
+            <input type="text" id="cm-notas" placeholder="ej: come poco a la noche" />
+          </div>
+          <button class="btn btn-primary btn-block" id="cm-save">Guardar comensal</button>
+          <button class="btn btn-danger btn-block" id="cm-delete" hidden style="margin-top:8px">Eliminar comensal</button>
+        </div>
+      </section>
+
+      <!-- ============ LISTA DE COMPRAS ============ -->
+      <section class="screen" id="sc-compras">
+        <div class="section-title">Comprar para rescatar lo que vence</div>
+        <div id="compras-comprar"></div>
+
+        <div class="section-title">Mejor no comprar todavía</div>
+        <div id="compras-nocomprar"></div>
+
+        <p class="hint-text">Comprar de más es una de las causas del desperdicio. Por eso la lista también te dice qué dejar en la góndola.</p>
+      </section>
+
+      <!-- ============ 11b. MI INFORMACIÓN ============ -->
+      <section class="screen" id="sc-mis-datos">
+        <div class="card">
+          <div class="form-row">
+            <label>Tu nombre</label>
+            <input type="text" id="pf-name" placeholder="Ej. Pablo" />
+          </div>
+          <div class="form-row">
+            <label>Correo (opcional, sólo local)</label>
+            <input type="email" id="pf-email" placeholder="tu@correo.com" />
+          </div>
+          <button class="btn btn-primary btn-block" id="pf-save">Guardar</button>
+          <p class="hint-text" style="text-align:left">Estos datos se guardan únicamente en este dispositivo. La app no tiene servidor ni envía información a ningún lado.</p>
+        </div>
+      </section>
+
+      <!-- ============ 12. CONFIGURACIÓN ============ -->
+      <section class="screen" id="sc-config">
+        <div class="section-title">Recordatorios</div>
+        <div class="card">
+          <div class="cfg-row">
+            <span>Alertas de vencimiento</span>
+            <label class="switch">
+              <input type="checkbox" id="cfg-alerts" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="cfg-row">
+            <span>Días de anticipación</span>
+            <select id="cfg-days" class="cfg-select">
+              <option value="1">1 día</option>
+              <option value="2">2 días</option>
+              <option value="3">3 días</option>
+              <option value="5">5 días</option>
+              <option value="7">7 días</option>
+              <option value="10">10 días</option>
+            </select>
+          </div>
+          <div class="cfg-row">
+            <span>Máximo de recetas sugeridas</span>
+            <select id="cfg-maxsug" class="cfg-select">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option>
+            </select>
+          </div>
+          <p class="hint-text" style="text-align:left" id="cfg-notif-estado"></p>
+          <button class="btn btn-outline btn-block" id="cfg-test-notif">Probar cómo se ve la alerta</button>
+        </div>
+
+        <div class="section-title">Tema</div>
+        <div class="card">
+          <div class="seg" id="cfg-theme">
+            <button class="seg-btn" data-theme="light">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+              Claro
+            </button>
+            <button class="seg-btn" data-theme="dark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+              Oscuro
+            </button>
+            <button class="seg-btn" data-theme="sistema">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Sistema
+            </button>
+          </div>
+        </div>
+
+        <div class="section-title">Copia de seguridad</div>
+        <div class="card">
+          <p class="hint-text" style="text-align:left;margin-top:0">Todo el historial vive en este dispositivo. Exportalo para no perder lo que el sistema aprendió.</p>
+          <button class="btn btn-primary btn-block" id="data-export" style="margin-bottom:8px">Exportar mis datos (.json)</button>
+          <input type="file" id="data-import-file" accept="application/json" hidden />
+          <button class="btn btn-outline btn-block" id="data-import">Importar copia de seguridad</button>
+        </div>
+
+        <div class="section-title">Acerca de la app</div>
+        <div class="card about-card">
+          <p><strong>Despensa Inteligente</strong> · Versión 1.0.0</p>
+          <p>Sistema multiagente para reducir el desperdicio de alimentos en el hogar.</p>
+          <p class="about-credit">Trabajo de Medio Ciclo · Inteligencia Artificial Aplicada a Organizaciones · UTN FRBA</p>
+        </div>
+      </section>
+
+      <!-- ============ PREFERENCIAS (desde Perfil) ============ -->
+      <section class="screen" id="sc-preferencias">
+        <div class="section-title">Restricciones alimentarias</div>
+        <div class="card">
+          <div class="form-row">
+            <label>Alergias (separadas por coma)</label>
+            <input type="text" id="pref-allergies" placeholder="ej: huevo, mani" />
+          </div>
+          <div class="form-row">
+            <label>Pautas alimentarias</label>
+            <div class="checkbox-row">
+              <label><input type="checkbox" id="pref-vegetariano" /> Vegetariano</label>
+              <label><input type="checkbox" id="pref-vegano" /> Vegano</label>
+              <label><input type="checkbox" id="pref-sintacc" /> Sin TACC</label>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" id="pref-save">Guardar preferencias</button>
+          <p class="hint-text" style="text-align:left">Las alergias funcionan como filtro duro: el Agente Cocinero nunca sugiere recetas que las incluyan.</p>
+        </div>
+
+        <div class="section-title">Tu estilo de cocina</div>
+        <div class="card">
+          <div class="form-row">
+            <label>Cocinas que preferís</label>
+            <div class="checkbox-row" id="pref-cocinas"></div>
+          </div>
+          <div class="form-row">
+            <label>Cuánto te gusta complicarte</label>
+            <div class="checkbox-row" id="pref-estilos"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="pref-save-estilo">Guardar estilo</button>
+          <p class="hint-text" style="text-align:left">Esto sólo orienta el orden de las sugerencias: nunca reemplaza la urgencia de lo que está por vencer, ni habilita algo que no podés comer. Si no marcás nada, el agente lo aprende solo de lo que cocinás y lo que descartás.</p>
+        </div>
+
+        <div class="section-title">Lo que el agente aprendió de tu gusto</div>
+        <div class="card" id="pref-estilo-aprendido"></div>
+
+        <div class="section-title">Generación de recetas con IA</div>
+        <div class="card">
+          <div class="form-row">
+            <label>Motor</label>
+            <select id="gen-motor">
+              <option value="ninguno">Desactivado — sólo el recetario local</option>
+              <option value="ollama">Ollama (modelo local en tu compu)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Dirección de Ollama</label>
+            <input type="text" id="gen-url" placeholder="http://localhost:11434" />
+          </div>
+          <div class="form-row">
+            <label>Modelo</label>
+            <input type="text" id="gen-modelo" placeholder="llama3.2" />
+          </div>
+          <button class="btn btn-primary btn-block" id="gen-guardar">Guardar</button>
+          <p class="hint-text" style="text-align:left">El modelo corre en tu computadora: ningún dato de tu despensa sale del dispositivo. Si está desactivado, la app funciona igual con el recetario local.</p>
+        </div>
+
+        <div class="section-title">Umbrales de aviso</div>
+        <div class="card" id="pref-thresholds"></div>
+
+        <div class="section-title">Recetas que descartaste</div>
+        <div class="card">
+          <div id="pref-dismissed"></div>
+          <button class="btn btn-outline btn-block" id="pref-restore-recipes" style="margin-top:10px">Volver a sugerir todas</button>
+        </div>
+
+        <div class="section-title">Ingredientes que el sistema empezó a evitar</div>
+        <div class="card" id="pref-avoided"></div>
+      </section>
+
+      <!-- ============ HISTORIAL (desde Perfil) ============ -->
+      <section class="screen" id="sc-historial">
+        <div class="section-title">Ritmo de consumo aprendido</div>
+        <div class="card" id="patrones-consumo"></div>
+        <div class="section-title">Desenlaces registrados</div>
+        <div class="card" id="historial-list"></div>
+      </section>
+
+      <!-- ============ SISTEMA · ciclo de agentes (desde Perfil) ============ -->
+      <section class="screen" id="sc-sistema">
+        <div class="card cycle-legend">
+          <strong>Ciclo de orquestación</strong>
+          <p>Observación → Análisis → Planificación → Acción → Evaluación → Aprendizaje</p>
+        </div>
+        <div class="section-title">Log en vivo</div>
+        <div class="card" id="system-log"></div>
+      </section>
+
+    </main>
+
+    <!-- Chatbot flotante: Agente Conversacional -->
+    <button class="chat-fab" id="chat-fab" title="Agente conversacional" aria-label="Abrir chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.2-3.6A7.96 7.96 0 0 1 4 12Z"/>
+        <path d="M9 11h6M9 14h4"/>
+      </svg>
+      <span class="chat-fab-dot"></span>
+    </button>
+
+    <!-- Tabbar con botón central elevado -->
+    <nav class="tabbar" id="tabbar">
+      <button class="tb-item active" data-nav="sc-inicio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>
+        <span>Inicio</span>
+      </button>
+      <button class="tb-item" data-nav="sc-productos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.5 12 4 3 8.5l9 4.5 9-4.5Z"/><path d="M3 8.5v7L12 20l9-4.5v-7"/></svg>
+        <span>Productos</span>
+      </button>
+      <button class="tb-add" id="tb-add" aria-label="Agregar producto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="tb-item" data-nav="sc-recetas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7a2 2 0 0 0 4 0V2"/><path d="M9 9v13"/><path d="M17 2c-1.7 0-3 2.2-3 5s1.3 5 3 5v10"/></svg>
+        <span>Recetas</span>
+      </button>
+      <button class="tb-item" data-nav="sc-perfil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        <span>Perfil</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ============ DRAWER: CHATBOT ============ -->
+  <div class="modal-overlay" id="chat-drawer-overlay">
+    <div class="modal-sheet chat-drawer">
+      <div class="chat-drawer-header">
+        <div class="chat-drawer-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.2-3.6A7.96 7.96 0 0 1 4 12Z"/><path d="M9 11h6M9 14h4"/></svg>
+          Agente conversacional
+        </div>
+        <button class="chat-drawer-close" id="chat-drawer-close" aria-label="Cerrar chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="chat-window" id="chat-window">
+        <div class="msg bot">¡Hola! Puedo cargar productos o responder consultas. Probá: "ingresé leche, vence el 20/08/2026" o "¿qué se me vence esta semana?"</div>
+      </div>
+      <div class="chat-input-bar">
+        <input type="text" id="chat-input" placeholder="Escribí un mensaje..." />
+        <button id="chat-send" aria-label="Enviar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 20 4l-6 16-3-7-7-1Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- Librerías externas (CDN) -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<!-- Memoria persistente y conocimiento -->
+<script src="js/db.js"></script>
+<script src="js/recipes.js"></script>
+<script src="js/illustrations.js"></script>
+
+<!-- Agentes (Sección 4 del diseño conceptual) -->
+<script src="js/agents/inventario.js"></script>
+<script src="js/agents/vencimientos.js"></script>
+<script src="js/agents/cocinero.js"></script>
+<script src="js/agents/evaluador.js"></script>
+<script src="js/agents/aprendizaje.js"></script>
+<script src="js/agents/impacto.js"></script>
+<script src="js/agents/hogar.js"></script>
+<script src="js/agents/compras.js"></script>
+<script src="js/agents/captura.js"></script>
+<script src="js/agents/conversacional.js"></script>
+<script src="js/agents/generador.js"></script>
+  <script src="js/agents/orquestador.js"></script>
+
+<!-- UI -->
+<script src="js/main.js"></script>
+</body>
+</html>
