@@ -1,0 +1,18 @@
+{
+  "name": "despensa-inteligente",
+  "version": "1.0.0",
+  "description": "Despensa Inteligente — app de gestión de despensa y prevención de desperdicio",
+  "scripts": {
+    "_comment": "postinstall corría 'cap sync android' cuando la carpeta android/ todavía no existe (la crea 'cap add'), así que el primer npm install fallaba siempre. Ahora 'preparar' hace las dos cosas en el orden correcto y es idempotente.",
+    "preparar": "npx cap add android || npx cap sync android",
+    "abrir": "npx cap open android",
+    "apk": "cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

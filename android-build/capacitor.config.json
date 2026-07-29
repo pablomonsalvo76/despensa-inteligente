@@ -1,0 +1,16 @@
+{
+  "appId": "ar.edu.utn.frba.despensainteligente",
+  "appName": "Despensa Inteligente",
+  "webDir": "www",
+  "backgroundColor": "#f2f7f1",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#2f8f4e",
+      "showSpinner": false
+    }
+  }
+}
