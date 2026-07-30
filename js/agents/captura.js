@@ -197,7 +197,7 @@ const AgenteCaptura = (() => {
     return umbral;
   }
 
-  function preprocesar(fuente, { roi = ROI_COMPLETA, anchoObjetivo = 900, binarizar = true } = {}) {
+  function preprocesar(fuente, { roi = ROI_COMPLETA, anchoObjetivo = 900, binarizar = true, local = false } = {}) {
     const w = fuente.videoWidth || fuente.naturalWidth || fuente.width;
     const h = fuente.videoHeight || fuente.naturalHeight || fuente.height;
     if (!w || !h) return null;
@@ -221,26 +221,143 @@ const AgenteCaptura = (() => {
 
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const d = img.data;
-    const hist = new Array(256).fill(0);
+    let hist = new Array(256).fill(0);
     for (let i = 0; i < d.length; i += 4) {
       const gris = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
       d[i] = d[i + 1] = d[i + 2] = gris;
       hist[gris]++;
     }
     const total = d.length / 4;
+
+    // Estirar el contraste ANTES de binarizar. Sin esto, un troquelado gris
+    // claro sobre etiqueta blanca se pierde entero (ver estirarContraste).
+    hist = estirarContraste(d, hist, total);
+
+    if (local) {
+      umbralLocalAdaptativo(d, canvas.width, canvas.height);
+      ctx.putImageData(img, 0, 0);
+      return canvas;
+    }
+
     const umbral = umbralOtsu(hist, total);
 
+    // `<=` y no `<`: Otsu devuelve el umbral como ÚLTIMO nivel de la clase
+    // oscura, así que los píxeles que caen justo en él son texto. Con `<`
+    // se perdía el borde del trazo — en una fecha troquelada, donde el
+    // trazo tiene dos o tres píxeles de ancho, eso es una parte apreciable
+    // del carácter.
     let oscuros = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i] < umbral) oscuros++;
+    for (let i = 0; i < d.length; i += 4) if (d[i] <= umbral) oscuros++;
     const invertir = oscuros > total * 0.55; // texto claro sobre fondo oscuro
 
     for (let i = 0; i < d.length; i += 4) {
-      let v = d[i] < umbral ? 0 : 255;
+      let v = d[i] <= umbral ? 0 : 255;
       if (invertir) v = 255 - v;
       d[i] = d[i + 1] = d[i + 2] = v;
     }
     ctx.putImageData(img, 0, 0);
     return canvas;
+  }
+
+  /* ---- Estiramiento de contraste ---------------------------------------
+     Normaliza el rango real de grises a 0–255, tomando percentiles (no el
+     mínimo y máximo absolutos, porque una sola mota o un brillo alcanzarían
+     para arruinar la escala).
+
+     ALCANCE REAL, medido y no supuesto: esto NO mejora el camino
+     binarizado. Se verificó con tres escenarios de bajo contraste y la
+     cantidad de píxeles de texto conservados fue idéntica con y sin
+     estiramiento. El motivo es matemático: la transformación es LINEAL y el
+     umbral de Otsu es invariante a escala — se corre proporcionalmente y
+     termina clasificando exactamente los mismos píxeles.
+
+     Dónde sí sirve: en la estrategia que pasa la imagen SIN binarizar
+     (`binarizar: false`), donde Tesseract recibe los grises directamente y
+     aplica su propio análisis. Ahí un histograma que ocupa todo el rango
+     es mejor entrada que uno apretado entre 208 y 250.
+
+     Para el problema de fondo —texto tenue con iluminación despareja— lo
+     que sirve es el umbral LOCAL de más abajo, no éste.
+     -------------------------------------------------------------------- */
+  function estirarContraste(d, hist, total) {
+    /* El percentil tiene que ser CHICO. En la foto de una fecha, el
+       troquelado ocupa apenas entre el 1 y el 3% de los píxeles del recorte:
+       con un recorte del 2% —que suena conservador— el propio texto que se
+       quiere rescatar cae dentro de lo descartado. Con 0,5% sigue alcanzando
+       para que una mota o un brillo aislado no definan la escala, que es lo
+       único que este recorte tiene que evitar. */
+    const recorte = Math.max(1, Math.floor(total * 0.005));
+
+    let bajo = 0, acum = 0;
+    for (let i = 0; i < 256; i++) { acum += hist[i]; if (acum > recorte) { bajo = i; break; } }
+    let alto = 255; acum = 0;
+    for (let i = 255; i >= 0; i--) { acum += hist[i]; if (acum > recorte) { alto = i; break; } }
+
+    // Si el rango ya es amplio, o es tan angosto que estirarlo sólo
+    // amplificaría ruido, se deja la imagen como está.
+    const rango = alto - bajo;
+    if (rango >= 200 || rango < 12) return hist;
+
+    const escala = 255 / rango;
+    const nuevo = new Array(256).fill(0);
+    for (let i = 0; i < d.length; i += 4) {
+      let v = Math.round((d[i] - bajo) * escala);
+      if (v < 0) v = 0; else if (v > 255) v = 255;
+      d[i] = d[i + 1] = d[i + 2] = v;
+      nuevo[v]++;
+    }
+    return nuevo;
+  }
+
+  /* ---- Umbral local (adaptativo) ---------------------------------------
+     Otsu usa UN umbral para toda la imagen. Alcanza cuando la iluminación
+     es pareja, y falla cuando el envase tiene un brillo de un lado y sombra
+     del otro —muy común fotografiando una tapa curva o un frasco—. Ahí, el
+     mismo corte que rescata la zona oscura satura la clara.
+
+     Este umbral se calcula por vecindad: cada píxel se compara con el
+     promedio de su entorno menos un margen. Se implementa con imagen
+     integral para que sea una sola pasada y no dependa del tamaño de la
+     ventana, si no en un celular sería inusable.
+     -------------------------------------------------------------------- */
+  function umbralLocalAdaptativo(d, w, h, ventana, margen = 10) {
+    const radio = Math.max(4, Math.floor((ventana || Math.max(w, h) / 16) / 2));
+    const integral = new Float64Array((w + 1) * (h + 1));
+
+    for (let y = 0; y < h; y++) {
+      let fila = 0;
+      for (let x = 0; x < w; x++) {
+        fila += d[(y * w + x) * 4];
+        integral[(y + 1) * (w + 1) + (x + 1)] = integral[y * (w + 1) + (x + 1)] + fila;
+      }
+    }
+
+    const suma = (x0, y0, x1, y1) =>
+      integral[y1 * (w + 1) + x1] - integral[y0 * (w + 1) + x1]
+      - integral[y1 * (w + 1) + x0] + integral[y0 * (w + 1) + x0];
+
+    let oscuros = 0;
+    const salida = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.max(0, y - radio), y1 = Math.min(h, y + radio + 1);
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.max(0, x - radio), x1 = Math.min(w, x + radio + 1);
+        const n = (x1 - x0) * (y1 - y0);
+        const media = suma(x0, y0, x1, y1) / n;
+        const v = d[(y * w + x) * 4];
+        const esTexto = v < media - margen;
+        if (esTexto) oscuros++;
+        salida[y * w + x] = esTexto ? 0 : 255;
+      }
+    }
+
+    // Misma autoinversión que en el camino de Otsu: Tesseract espera texto
+    // oscuro sobre fondo claro.
+    const invertir = oscuros > w * h * 0.55;
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const v = invertir ? 255 - salida[p] : salida[p];
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
   }
 
   /* ---- Aplanado de resultados ------------------------------------------
@@ -278,8 +395,11 @@ const AgenteCaptura = (() => {
   const ESTRATEGIAS = [
     { psm: '11', binarizar: false, ancho: 1400 },
     { psm: '7',  binarizar: true,  ancho: 1400 },
+    // Umbral local: para tapas curvas y frascos, donde hay brillo de un lado
+    // y sombra del otro y un umbral global no puede servir a los dos.
+    { psm: '7',  binarizar: true,  ancho: 1400, local: true },
     { psm: '6',  binarizar: true,  ancho: 1100 },
-    { psm: '11', binarizar: true,  ancho: 1800 }
+    { psm: '11', binarizar: true,  ancho: 1800, local: true }
   ];
 
   function cargarImagen(src) {
@@ -291,9 +411,9 @@ const AgenteCaptura = (() => {
     });
   }
 
-  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho }) {
+  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho, local }) {
     const worker = await obtenerWorker();
-    const entrada = preprocesar(imagen, { roi, anchoObjetivo: ancho, binarizar }) || imagen;
+    const entrada = preprocesar(imagen, { roi, anchoObjetivo: ancho, binarizar, local }) || imagen;
     try { await worker.setParameters({ tessedit_pageseg_mode: psm }); } catch (e) { /* opcional */ }
     // Se piden `blocks` explícitamente: Tesseract.js v5 ya no devuelve
     // `lines`/`words` planos, y sin los bloques no hay forma de saber qué
@@ -914,6 +1034,7 @@ const AgenteCaptura = (() => {
     procesarManual, procesarEscaneo, procesarFoto, resolverGTIN,
     extraerFecha, extraerNombre, validarYNormalizar, estimarVencimiento,
     VIDA_UTIL_DIAS, iniciarEscaneoContinuo, iniciarEscaneoFecha,
+    estirarContraste, umbralOtsu, umbralLocalAdaptativo,
     detenerEscaneo, estaEscaneando, preprocesar, liberarOCR,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };
