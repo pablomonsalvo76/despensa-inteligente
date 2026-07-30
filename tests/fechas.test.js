@@ -139,7 +139,20 @@ const casos = [
   // matcheaba la cola ("01/ 27") generando un fin de enero que le ganaba
   // a la fecha real por ser posterior.
   ['fecha partida por el OCR',  '23/ 01/ 27',                             '2027-01-23'],
-  ['partida con más espacio',   '23 / 01 / 27',                           '2027-01-23']
+  ['partida con más espacio',   '23 / 01 / 27',                           '2027-01-23'],
+
+  /* --- REGRESIÓN: corrección por plausibilidad ------------------------
+     Medido sobre la foto real de un sachet: el OCR devuelve "23/01/97".
+     Estructuralmente es una fecha, pero 1997 es implausible y se
+     descartaba entera. Un dígito mal leído del troquelado se corrige
+     usando la plausibilidad como restricción, igual que lo haría una
+     persona: un pote de mayonesa no vence en 1997. */
+  ['OCR leyó 97 en vez de 27',  '23/01/97',                               '2027-01-23'],
+  ['un 8 leído como 3',         'vto 23/01/38',                           null],
+  ['no corrige basura',         '99/99/99',                               null],
+  ['no corrige lo invalido',    '45/13/88',                               null],
+  ['no toca una fecha válida',  '23/01/27',                               '2027-01-23'],
+  ['no revive una fecha vieja', '01/01/1990',                             null]
 ];
 
 // ---- Corrida ----

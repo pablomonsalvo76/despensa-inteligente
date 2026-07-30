@@ -764,6 +764,17 @@ document.addEventListener('DOMContentLoaded', () => {
         vibrar(40);
       },
 
+      // Una fecha DEDUCIDA nunca entra en silencio: se muestra qué leyó la
+      // cámara y qué se propone, y el usuario decide. El sistema propone,
+      // la persona confirma — el mismo principio que con el modelo de IA.
+      onCorreccion: (c) => {
+        const cont = find('auto-crudo');
+        if (!cont || !c) return;
+        cont.hidden = false;
+        cont.innerHTML = `<strong>Ojo:</strong> leí <code>${escapeHtml(c.leido)}</code>, que no es una fecha posible. ` +
+          `Interpreté <strong>${escapeHtml(fmtFecha(c.propuesto))}</strong> corrigiendo un dígito. Verificalo abajo.`;
+      },
+
       onFecha: (iso, confianza, motivo) => {
         if (motivo === 'sin_motor') {
           pasoEstado('step-fecha', '', 'sin conexión');

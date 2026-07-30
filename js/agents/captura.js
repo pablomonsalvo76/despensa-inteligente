@@ -197,7 +197,7 @@ const AgenteCaptura = (() => {
     return umbral;
   }
 
-  function preprocesar(fuente, { roi = ROI_COMPLETA, anchoObjetivo = 900, binarizar = true, local = false } = {}) {
+  function preprocesar(fuente, { roi = ROI_COMPLETA, anchoObjetivo = 900, binarizar = true, local = false, cerrar = 0 } = {}) {
     const w = fuente.videoWidth || fuente.naturalWidth || fuente.width;
     const h = fuente.videoHeight || fuente.naturalHeight || fuente.height;
     if (!w || !h) return null;
@@ -232,6 +232,10 @@ const AgenteCaptura = (() => {
     // Estirar el contraste ANTES de binarizar. Sin esto, un troquelado gris
     // claro sobre etiqueta blanca se pierde entero (ver estirarContraste).
     hist = estirarContraste(d, hist, total);
+
+    // El cierre va ANTES de binarizar: opera sobre los grises, donde los
+    // puntos todavía tienen gradiente y se funden bien entre sí.
+    if (cerrar > 0) cerrarPuntos(d, canvas.width, canvas.height, cerrar);
 
     if (local) {
       umbralLocalAdaptativo(d, canvas.width, canvas.height);
@@ -320,6 +324,56 @@ const AgenteCaptura = (() => {
      integral para que sea una sola pasada y no dependa del tamaño de la
      ventana, si no en un celular sería inusable.
      -------------------------------------------------------------------- */
+  /* ---- Cierre morfológico: unir los puntos de la matriz ----------------
+     LA PIEZA QUE FALTABA, y se midió sobre la foto real de un envase.
+
+     El troquelado de una fecha se imprime por matriz de puntos o láser: los
+     caracteres NO son trazos continuos, son puntos separados. Tesseract está
+     entrenado sobre tipografía impresa, con trazos enteros, y frente a una
+     nube de puntos no reconoce nada — devuelve vacío o inventa.
+
+     Todo lo que veníamos haciendo (contraste, umbrales, resolución) atacaba
+     la VISIBILIDAD del texto, nunca su CONTINUIDAD. Medido sobre la foto de
+     un sachet de mayonesa, el recorte de la fecha ocupaba 100×37 px con 37
+     niveles de contraste, y el pipeline sin este paso devolvía vacío en
+     todas las variantes probadas. Con el cierre, "23/01/97" — seis de ocho
+     caracteres, y el resto lo arregla la corrección por plausibilidad.
+
+     La operación es una dilatación de lo oscuro (mínimo en la vecindad)
+     seguida de una erosión suave (máximo), que engorda los puntos hasta que
+     se tocan y después recorta el exceso. Se implementa con dos pasadas
+     separables —horizontal y vertical— para que sea O(n) y no O(n·r²), que
+     en un celular es la diferencia entre viable e inusable.
+     -------------------------------------------------------------------- */
+  function filtroRango(d, w, h, radio, esMinimo) {
+    if (radio < 1) return;
+    const tmp = new Uint8Array(w * h);
+    const extremo = esMinimo ? Math.min : Math.max;
+
+    for (let y = 0; y < h; y++) {          // pasada horizontal
+      for (let x = 0; x < w; x++) {
+        let v = d[(y * w + x) * 4];
+        const x0 = Math.max(0, x - radio), x1 = Math.min(w - 1, x + radio);
+        for (let k = x0; k <= x1; k++) v = extremo(v, d[(y * w + k) * 4]);
+        tmp[y * w + x] = v;
+      }
+    }
+    for (let y = 0; y < h; y++) {          // pasada vertical
+      for (let x = 0; x < w; x++) {
+        let v = tmp[y * w + x];
+        const y0 = Math.max(0, y - radio), y1 = Math.min(h - 1, y + radio);
+        for (let k = y0; k <= y1; k++) v = extremo(v, tmp[k * w + x]);
+        const i = (y * w + x) * 4;
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+    }
+  }
+
+  function cerrarPuntos(d, w, h, radio = 3) {
+    filtroRango(d, w, h, radio, true);            // engorda lo oscuro
+    filtroRango(d, w, h, Math.max(1, radio - 2), false);  // recorta el exceso
+  }
+
   function umbralLocalAdaptativo(d, w, h, ventana, margen = 10) {
     const radio = Math.max(4, Math.floor((ventana || Math.max(w, h) / 16) / 2));
     const integral = new Float64Array((w + 1) * (h + 1));
@@ -428,8 +482,11 @@ const AgenteCaptura = (() => {
   /* Cada estrategia declara para qué sirve. La que busca el NOMBRE necesita
      el alfabeto completo, así que va sin restricción y es la única. */
   const ESTRATEGIAS = [
+    // Las dos primeras llevan cierre morfológico: es lo único que hizo leer
+    // el troquelado real en las mediciones sobre la foto del envase.
+    { psm: '7',  binarizar: false, ancho: 1600, alfabeto: ALFABETO_NUMERICO, cerrar: 3 },
+    { psm: '7',  binarizar: false, ancho: 2000, alfabeto: ALFABETO_NUMERICO, cerrar: 4 },
     { psm: '7',  binarizar: true,  ancho: 1400, alfabeto: ALFABETO_NUMERICO },
-    { psm: '11', binarizar: false, ancho: 1400, alfabeto: ALFABETO_NUMERICO },
     // Umbral local: para tapas curvas y frascos, donde hay brillo de un lado
     // y sombra del otro y un umbral global no puede servir a los dos.
     { psm: '7',  binarizar: true,  ancho: 1400, local: true, alfabeto: ALFABETO_CON_MES },
@@ -476,9 +533,9 @@ const AgenteCaptura = (() => {
     });
   }
 
-  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho, local, alfabeto }) {
+  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho, local, alfabeto, cerrar }) {
     const worker = await obtenerWorker();
-    const entrada = preprocesar(imagen, { roi, anchoObjetivo: ancho, binarizar, local }) || imagen;
+    const entrada = preprocesar(imagen, { roi, anchoObjetivo: ancho, binarizar, local, cerrar }) || imagen;
     try {
       // El whitelist se limpia explícitamente cuando la estrategia no lo pide:
       // el worker es persistente y el parámetro queda pegado entre llamadas.
@@ -522,7 +579,7 @@ const AgenteCaptura = (() => {
       if (nombre && (!mejorNombre || nombre.confianza > mejorNombre.confianza)) mejorNombre = nombre;
 
       const h = extraerFechaConConfianza(texto, aplanarPalabras(data));
-      if (h.fecha) { hallazgo = h; break; }
+      if (h.fecha) { hallazgo = h; hallazgo.correccion = tomarCorreccion(); break; }
     }
 
     if (!mejorTexto) {
@@ -539,6 +596,9 @@ const AgenteCaptura = (() => {
       fechaDetectada: hallazgo.fecha,
       nombreDetectado: mejorNombre,
       crudo: hallazgo.crudo,
+      // Si la fecha salió de corregir un dígito, se informa para que la UI
+      // lo diga explícitamente y el usuario confirme.
+      correccion: hallazgo.correccion || null,
       confianza,
       requiereConfirmacion: confianza < minConfidence
     };
@@ -706,7 +766,69 @@ const AgenteCaptura = (() => {
    * Descarta fechas implausibles (más de un año en el pasado o más de 10 en
    * el futuro), que suelen ser lecturas erróneas de lotes o códigos.
    */
+  /* ---- Corrección por plausibilidad ------------------------------------
+     Medido sobre la foto real de un envase: el OCR devolvía "23/01/97".
+     Estructuralmente es una fecha perfecta, pero 1997 es implausible para un
+     producto en la despensa, así que el validador la descartaba y no
+     quedaba nada. Un humano no se confunde: sabe que un pote de mayonesa no
+     vence en 1997 y lee 27.
+
+     Eso es información que el sistema también tiene. La ventana de
+     plausibilidad —un año atrás, diez adelante— deja sólo unos 12 años
+     válidos de 100 posibles, así que probar UNA sustitución de dígito casi
+     siempre da una respuesta única.
+
+     Tres guardas para que esto no invente fechas:
+       · Sólo se aplica si la lectura original NO es plausible. Una fecha
+         válida jamás se "corrige" (si no, 23/01/27 tendría cuatro vecinos
+         plausibles y elegiríamos al azar).
+       · Sólo UNA sustitución, y sólo entre dígitos que se confunden de
+         verdad en matriz de puntos, no cualquier par.
+       · Si hay más de un resultado plausible, se descarta todo: ante la
+         duda es preferible pedirle la fecha al usuario que adivinar.
+     -------------------------------------------------------------------- */
+  const CONFUSION_DIGITOS = {
+    '0': '689', '1': '74', '2': '973', '3': '89', '4': '19',
+    '5': '683', '6': '5803', '7': '12', '8': '630', '9': '2385'
+  };
+
+  // Deja registro de la última corrección aplicada, para que la interfaz
+  // pueda MOSTRARLA en vez de aceptarla en silencio. Una fecha deducida no
+  // puede entrar al inventario sin que el usuario la vea.
+  let ultimaCorreccion = null;
+  function tomarCorreccion() { const c = ultimaCorreccion; ultimaCorreccion = null; return c; }
+
+  function corregirPorPlausibilidad(dd, mm, aa) {
+    const campos = [dd, mm, aa];
+    const encontradas = new Set();
+
+    for (let i = 0; i < campos.length; i++) {
+      const campo = campos[i];
+      /* El año de CUATRO dígitos no se corrige. Con cuatro caracteres hay
+         mucha más redundancia que con dos, así que si aun así sale
+         implausible lo más probable es que no fuera una fecha — y corregir
+         "2099" a "2029" sería inventar. El problema real vive en los años
+         de dos dígitos, que es como viene troquelada la mayoría. */
+      if (i === 2 && campo.length === 4) continue;
+      for (let p = 0; p < campo.length; p++) {
+        for (const alt of (CONFUSION_DIGITOS[campo[p]] || '')) {
+          const cambiado = campo.slice(0, p) + alt + campo.slice(p + 1);
+          const c = campos.slice();
+          c[i] = cambiado;
+          const iso = armarISO(c[2], c[1], c[0]);
+          if (iso) encontradas.add(iso);
+        }
+      }
+    }
+    // Ambigua o sin salida: no se adivina.
+    if (encontradas.size !== 1) return null;
+    const iso = [...encontradas][0];
+    ultimaCorreccion = { leido: `${dd}/${mm}/${aa}`, propuesto: iso };
+    return iso;
+  }
+
   function extraerFecha(texto) {
+    ultimaCorreccion = null;
     const base = ' ' + String(texto).toLowerCase().replace(/\s+/g, ' ') + ' ';
 
     // Las variantes se prueban EN ORDEN y gana la primera que dé resultado:
@@ -742,7 +864,14 @@ const AgenteCaptura = (() => {
 
       // dd/mm/yyyy · dd-mm-yy · dd.mm.yyyy · dd mm yyyy
       re = /(\d{1,2})[\s\/\-.]{1,3}(\d{1,2})[\s\/\-.]{1,3}(\d{2,4})/g;
-      while ((m = re.exec(t))) agregar(armarISO(m[3], m[2], m[1]), m.index);
+      while ((m = re.exec(t))) {
+        let iso = armarISO(m[3], m[2], m[1]);
+        // La lectura tiene forma de fecha pero cae fuera de lo plausible:
+        // suele ser UN dígito mal leído del troquelado. Se intenta corregir
+        // usando la propia plausibilidad como restricción.
+        if (!iso) iso = corregirPorPlausibilidad(m[1], m[2], m[3]);
+        agregar(iso, m.index);
+      }
 
       // yyyy-mm-dd
       re = /(20\d{2})[\s\/\-.]{1,3}(\d{1,2})[\s\/\-.]{1,3}(\d{1,2})/g;
@@ -1134,7 +1263,7 @@ const AgenteCaptura = (() => {
   async function iniciarEscaneoContinuo(video, {
     buscarNombre = false,
     onProgreso = () => {}, onFecha = () => {}, onNombre = () => {},
-    onTexto = () => {},
+    onTexto = () => {}, onCorreccion = () => {},
     minConfianza = 0.55, intervaloMs = 500,
     presupuestoMs = 10000,        // techo duro: pasado esto se corta
     intentosConfirmacion = 2,     // vueltas extra para confirmar una lectura
@@ -1187,6 +1316,7 @@ const AgenteCaptura = (() => {
           // usuario ver que la cámara está leyendo algo, y lo que hace
           // diagnosticable un fallo.
           if (res.textoDetectado) onTexto(res.textoDetectado);
+          if (res.correccion) onCorreccion(res.correccion);
 
           if (!nombreEntregado && res.nombreDetectado && res.nombreDetectado.confianza >= 0.7) {
             nombreEntregado = true;
@@ -1248,8 +1378,8 @@ const AgenteCaptura = (() => {
     procesarManual, procesarEscaneo, procesarFoto, resolverGTIN,
     extraerFecha, extraerNombre, validarYNormalizar, estimarVencimiento,
     VIDA_UTIL_DIAS, iniciarEscaneoContinuo, iniciarEscaneoFecha,
-    estirarContraste, umbralOtsu, umbralLocalAdaptativo,
-    tieneFormaDeFecha, extraerFechaConConfianza,
+    estirarContraste, umbralOtsu, umbralLocalAdaptativo, cerrarPuntos,
+    tieneFormaDeFecha, extraerFechaConConfianza, corregirPorPlausibilidad, tomarCorreccion,
     detenerEscaneo, estaEscaneando, preprocesar, liberarOCR,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };
