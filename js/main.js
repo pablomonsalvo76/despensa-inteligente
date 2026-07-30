@@ -621,6 +621,15 @@ document.addEventListener('DOMContentLoaded', () => {
       set('auto-torch', 'hidden', !tieneLinterna);
       if (tieneLinterna) set('auto-torch', 'textContent', 'Linterna');
     }, 900);
+    /* Se dispara la carga del modelo PP-OCR en cuanto se abre la cámara,
+       en paralelo con el arranque del lector: son 11 MB que conviene tener
+       bajando mientras el usuario todavía está encuadrando. Si falla, la
+       app sigue con Tesseract. */
+    if (typeof MotorPPOCR !== 'undefined' && MotorPPOCR.soportado() && !MotorPPOCR.estaListo()) {
+      MotorPPOCR.preparar((msg) => { if (msg) set('auto-status', 'textContent', msg); })
+        .catch((e) => console.warn('PP-OCR no disponible:', e.message));
+    }
+
     pasoEstado('step-codigo', 'buscando', 'buscando…');
     pasoEstado('step-nombre', 'buscando', 'buscando…');
     pasoEstado('step-fecha', 'buscando', 'buscando…');

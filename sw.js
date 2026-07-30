@@ -1,7 +1,7 @@
 // Service worker mínimo: cachea el shell de la app para que abra offline
 // (los agentes y la memoria en localStorage funcionan sin conexión;
 // sólo el escaneo por GTIN y el OCR remoto de librerías requieren red).
-const CACHE = 'despensa-inteligente-v26';
+const CACHE = 'despensa-inteligente-v27';
 const ASSETS = [
   './', './index.html', './css/styles.css',
   './js/db.js', './js/recipes.js', './js/illustrations.js', './js/main.js',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/agents/evaluador.js', './js/agents/aprendizaje.js', './js/agents/captura.js',
   './js/agents/conversacional.js', './js/agents/orquestador.js', './js/agents/impacto.js',
   './js/agents/hogar.js', './js/agents/compras.js', './js/agents/generador.js',
+  './js/agents/ppocr.js',
   './manifest.json', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-192.png', './icons/icon-maskable-512.png'
 ];

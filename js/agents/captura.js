@@ -590,6 +590,64 @@ const AgenteCaptura = (() => {
     return data;
   }
 
+  /* ---- Camino PP-OCR ----------------------------------------------------
+     El motor preferido cuando está disponible. Se embarca sólo el modelo de
+     RECONOCIMIENTO, así que la "detección" la hace este barrido: se recorre
+     el encuadre con franjas horizontales solapadas y se reconoce cada una.
+
+     Las franjas se solapan a la mitad a propósito. Una fecha que cae justo
+     en el borde entre dos franjas quedaría partida en las dos; con
+     solapamiento, siempre hay una franja que la contiene entera. Es el mismo
+     principio que aprendimos midiendo: cortar un renglón por la mitad
+     convierte un 2 en un 9.
+     -------------------------------------------------------------------- */
+  async function leerConPPOCR(fuente, roi) {
+    if (typeof MotorPPOCR === 'undefined' || !MotorPPOCR.estaListo()) return null;
+
+    // Sin binarizar: PP-OCR trabaja mejor sobre los grises normalizados que
+    // sobre una imagen de dos tonos, al revés que Tesseract.
+    const lienzo = preprocesar(fuente, { roi, anchoObjetivo: 1000, binarizar: false });
+    if (!lienzo) return null;
+
+    const alturas = [lienzo.height, Math.round(lienzo.height / 2), Math.round(lienzo.height / 3)];
+    const lecturas = [];
+
+    for (const alto of alturas) {
+      if (alto < 12) continue;
+      const paso = Math.max(6, Math.round(alto / 2));
+      for (let y = 0; y + alto <= lienzo.height + paso; y += paso) {
+        const y0 = Math.min(y, Math.max(0, lienzo.height - alto));
+        const franja = document.createElement('canvas');
+        franja.width = lienzo.width;
+        franja.height = Math.min(alto, lienzo.height - y0);
+        if (franja.height < 12) continue;
+        franja.getContext('2d').drawImage(
+          lienzo, 0, y0, franja.width, franja.height, 0, 0, franja.width, franja.height);
+
+        try {
+          const r = await MotorPPOCR.leerFranja(franja);
+          if (r.texto && r.texto.trim()) lecturas.push(r);
+        } catch (e) { /* una franja que falla no aborta el barrido */ }
+      }
+      // Si con la franja entera ya salió una fecha, no hace falta subdividir.
+      if (lecturas.some((l) => extraerFecha(l.texto))) break;
+    }
+
+    if (!lecturas.length) return null;
+
+    // Entre las lecturas que contienen una fecha válida, gana la de mayor
+    // confianza. El propio modelo la reporta, así que no hay que estimarla.
+    const conFecha = lecturas
+      .map((l) => ({ ...l, fecha: extraerFecha(l.texto) }))
+      .filter((l) => l.fecha)
+      .sort((a, b) => b.confianza - a.confianza);
+
+    return {
+      texto: lecturas.map((l) => l.texto).join(' '),
+      mejor: conFecha[0] || null
+    };
+  }
+
   /**
    * Ejecuta el OCR sobre una imagen o un frame de video y extrae la fecha de
    * vencimiento y el nombre del producto.
@@ -602,6 +660,29 @@ const AgenteCaptura = (() => {
     // modo foto no leía ninguna fecha. Ahora se materializa en un <img> y
     // pasa por el mismo tratamiento que un frame de la cámara.
     const imagen = typeof fuente === 'string' ? await cargarImagen(fuente) : fuente;
+
+    /* PP-OCR PRIMERO. Medido sobre la foto real de un envase: Tesseract no
+       leyó la fecha en ninguna variante; PP-OCR la leyó en todos los
+       encuadres. Si el modelo está cargado y encuentra una fecha, se
+       devuelve y no se gasta tiempo en el camino viejo. */
+    try {
+      const pp = await leerConPPOCR(imagen, roi);
+      if (pp && pp.mejor) {
+        return {
+          estado: pp.mejor.confianza >= minConfidence ? 'ok' : 'baja_confianza',
+          textoDetectado: pp.texto,
+          fechaDetectada: pp.mejor.fecha,
+          nombreDetectado: null,
+          crudo: pp.mejor.texto,
+          correccion: tomarCorreccion(),
+          confianza: pp.mejor.confianza,
+          motor: 'ppocr',
+          requiereConfirmacion: pp.mejor.confianza < minConfidence
+        };
+      }
+    } catch (e) {
+      console.warn('PP-OCR no disponible en este intento', e);
+    }
 
     let mejorTexto = '';
     let mejorNombre = null;
@@ -1430,7 +1511,7 @@ const AgenteCaptura = (() => {
     VIDA_UTIL_DIAS, iniciarEscaneoContinuo, iniciarEscaneoFecha,
     estirarContraste, umbralOtsu, umbralLocalAdaptativo, cerrarPuntos,
     tieneFormaDeFecha, extraerFechaConConfianza, corregirPorPlausibilidad, tomarCorreccion,
-    detenerEscaneo, estaEscaneando, preprocesar, liberarOCR,
+    detenerEscaneo, estaEscaneando, preprocesar, liberarOCR, leerConPPOCR,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };
 })();

@@ -755,6 +755,9 @@
 <!-- Librerías externas (CDN) -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- ONNX Runtime Web: motor del modelo PP-OCR. Bundle UMD clasico (360 KB),
+     expone `ort` global: no requiere build step, igual que el resto. -->
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.js"></script>
 
 <!-- Memoria persistente y conocimiento -->
 <script src="js/db.js"></script>
@@ -770,6 +773,7 @@
 <script src="js/agents/impacto.js"></script>
 <script src="js/agents/hogar.js"></script>
 <script src="js/agents/compras.js"></script>
+<script src="js/agents/ppocr.js"></script>
 <script src="js/agents/captura.js"></script>
 <script src="js/agents/conversacional.js"></script>
 <script src="js/agents/generador.js"></script>
