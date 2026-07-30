@@ -1,7 +1,7 @@
 // Service worker mínimo: cachea el shell de la app para que abra offline
 // (los agentes y la memoria en localStorage funcionan sin conexión;
 // sólo el escaneo por GTIN y el OCR remoto de librerías requieren red).
-const CACHE = 'despensa-inteligente-v21';
+const CACHE = 'despensa-inteligente-v22';
 const ASSETS = [
   './', './index.html', './css/styles.css',
   './js/db.js', './js/recipes.js', './js/illustrations.js', './js/main.js',
@@ -16,6 +16,17 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).catch(() => {}));
   self.skipWaiting();
+});
+
+// La página pregunta qué versión está sirviendo este service worker. Es la
+// única forma de saber, desde el teléfono, si se está corriendo el código
+// nuevo o uno cacheado: sin esto uno puede pasar media hora reportando un
+// bug que ya está arreglado, simplemente porque el dispositivo sirvió una
+// versión vieja.
+self.addEventListener('message', (event) => {
+  if (event.data === 'version' && event.source) {
+    event.source.postMessage({ tipo: 'version', cache: CACHE });
+  }
 });
 
 self.addEventListener('activate', (event) => {

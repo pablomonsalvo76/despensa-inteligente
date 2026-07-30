@@ -31,10 +31,20 @@ const stub = () => {
   c.getContext = () => ({
     imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
     drawImage: noop,
-    getImageData: () => ({
-      data: new Uint8ClampedArray(Math.max(1, c.width * c.height) * 4).fill(200),
-      width: c.width, height: c.height
-    }),
+    /* Los datos tienen CONTRASTE a propósito. Rellenar uniforme hacía que
+       `cuadroSinContenido` descartara todos los cuadros por considerarlos
+       vacíos —que es justamente su trabajo— y ningún intento llegaba al
+       OCR. Un patrón alternado simula una imagen con texto. */
+    getImageData: () => {
+      const n = Math.max(1, c.width * c.height);
+      const d = new Uint8ClampedArray(n * 4);
+      for (let p = 0; p < n; p++) {
+        const v = (p % 7 === 0) ? 30 : 230;
+        d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = v;
+        d[p * 4 + 3] = 255;
+      }
+      return { data: d, width: c.width, height: c.height };
+    },
     putImageData: noop
   });
   return c;
@@ -229,6 +239,53 @@ const video = { videoWidth: 320, videoHeight: 240 };
     chequear('detener no dispara un aviso de fallo', !avisado,
       'reportó "no encontrada" tras una cancelación del usuario');
     chequear('detener deja el escaneo inactivo', !cap.estaEscaneando(), 'quedó activo');
+  }
+
+  /* ==================================================================
+     REGRESIÓN: alfabeto restringido contra la alucinación del OCR
+     ------------------------------------------------------------------
+     Sobre un cuadro oscuro y vacío, Tesseract en modo "texto disperso"
+     devolvió texto inventado:
+
+       "ib A LK FY Se > dik hoa ad wae » Lay a 2, Rot, &3 ot & el 3 Ae sal"
+
+     No leyó mal: no había nada y aun así produjo letras. Limitar el
+     alfabeto a dígitos y separadores hace que ni siquiera pueda hacerlo.
+     ================================================================ */
+  {
+    const conAlfabeto = cap.ESTRATEGIAS.filter((e) => e.alfabeto);
+    chequear('la mayoría de las estrategias restringen el alfabeto',
+      conAlfabeto.length >= cap.ESTRATEGIAS.length - 1,
+      `${conAlfabeto.length} de ${cap.ESTRATEGIAS.length}`);
+
+    chequear('ningún alfabeto admite minúsculas ni símbolos raros',
+      conAlfabeto.every((e) => !/[a-z»&>]/.test(e.alfabeto)),
+      `alfabeto: ${conAlfabeto[0] && conAlfabeto[0].alfabeto}`);
+
+    // REGRESIÓN: al restringir a dígitos se rompían las fechas con el mes
+    // en letras ("20 AGO 2027", "DIC 2026"), que el extractor sí soporta.
+    const conMes = cap.ESTRATEGIAS.find((e) => e.alfabeto && /[A-Z]/.test(e.alfabeto));
+    chequear('hay una estrategia que puede leer meses en letras',
+      !!conMes, 'ninguna estrategia admite letras: AGO, DIC, etc. quedarían ilegibles');
+    if (conMes) {
+      const meses = ['ENE','JAN','FEB','MAR','ABR','APR','MAY','JUN','JUL',
+                     'AGO','AUG','SEP','SET','OCT','NOV','DIC','DEC'];
+      const sinCubrir = meses.filter((m) => [...m].some((c) => !conMes.alfabeto.includes(c)));
+      chequear('ese alfabeto cubre los 17 meses que entiende el extractor',
+        sinCubrir.length === 0, `sin cubrir: ${sinCubrir.join(', ')}`);
+    }
+
+    chequear('el alfabeto de fecha cubre los separadores usados en envases',
+      conAlfabeto.every((e) => ['/', '-', '.', ' '].every((c) => e.alfabeto.includes(c))),
+      `alfabeto: ${conAlfabeto[0] && conAlfabeto[0].alfabeto}`);
+
+    chequear('queda una estrategia sin restricción, para leer el nombre',
+      cap.ESTRATEGIAS.some((e) => !e.alfabeto), 'todas restringidas: el nombre no se podría leer');
+
+    // El texto alucinado real, pasado por el extractor: no debe dar fecha.
+    const basura = 'ib A LK FY Se > dik hoa ad wae » Lay a 2, Rot, &3 ot & el 3 Ae sal A LR AALS 8.';
+    chequear('el texto alucinado no produce una fecha falsa',
+      cap.extraerFecha(basura) === null, `devolvió ${cap.extraerFecha(basura)}`);
   }
 
   const total = ok + fallos.length;

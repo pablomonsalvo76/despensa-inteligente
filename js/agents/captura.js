@@ -392,15 +392,80 @@ const AgenteCaptura = (() => {
      Sin binarizar funciona mejor sobre impresión láser clara; binarizado,
      sobre matriz de puntos. Por eso están las dos variantes.
      -------------------------------------------------------------------- */
+  /* Alfabeto restringido para la fecha.
+     -----------------------------------------------------------------------
+     Sin esto, Tesseract en modo "texto disperso" alucina letras a partir del
+     ruido de la imagen. Sobre un cuadro oscuro y vacío llegó a devolver:
+
+       "ib A LK FY Se > dik hoa ad wae » Lay a 2, Rot, &3 ot & el 3 Ae sal"
+
+     No es que leyera mal: no había nada para leer y aun así produjo texto.
+     Después ese texto entra al extractor de fechas, donde cualquier par de
+     dígitos inventados puede convertirse en una fecha falsa.
+
+     Limitando el alfabeto a dígitos y separadores, el motor ya no PUEDE
+     devolver eso. Es la defensa más efectiva y la más barata: no cuesta
+     tiempo de cómputo, sólo acota el espacio de salidas posibles. */
+  const ALFABETO_NUMERICO = '0123456789/-. :';
+
+  /* Segundo alfabeto, para las fechas con el mes en letras: "20 AGO 2027",
+     "DIC 2026". Restringir a dígitos y nada más habría roto esos formatos,
+     que el extractor sí soporta.
+
+     Las letras salen de MESES_TXT y son 20 de 26 — bastante permisivo. Aun
+     así sirve, porque lo que más ensucia la alucinación no son las letras
+     sino la MEZCLA de mayúsculas, minúsculas y símbolos: en el texto que
+     inventó el motor aparecían "»", "&", ">" y minúsculas sueltas. Al
+     limitarlo a mayúsculas de meses más dígitos, ese ruido desaparece.
+
+     Los dos alfabetos conviven a propósito: la mayoría de las estrategias
+     usa el numérico —que es lo troquelado en la mayoría de los envases— y
+     una prueba con meses en letras. Si la primera no encuentra nada, la
+     otra tiene su oportunidad dentro del mismo presupuesto de tiempo. */
+  const LETRAS_MES = 'ABCDEFGIJLMNOPRSTUVY';
+  const ALFABETO_CON_MES = ALFABETO_NUMERICO + LETRAS_MES;
+
+  /* Cada estrategia declara para qué sirve. La que busca el NOMBRE necesita
+     el alfabeto completo, así que va sin restricción y es la única. */
   const ESTRATEGIAS = [
-    { psm: '11', binarizar: false, ancho: 1400 },
-    { psm: '7',  binarizar: true,  ancho: 1400 },
+    { psm: '7',  binarizar: true,  ancho: 1400, alfabeto: ALFABETO_NUMERICO },
+    { psm: '11', binarizar: false, ancho: 1400, alfabeto: ALFABETO_NUMERICO },
     // Umbral local: para tapas curvas y frascos, donde hay brillo de un lado
     // y sombra del otro y un umbral global no puede servir a los dos.
-    { psm: '7',  binarizar: true,  ancho: 1400, local: true },
-    { psm: '6',  binarizar: true,  ancho: 1100 },
-    { psm: '11', binarizar: true,  ancho: 1800, local: true }
+    { psm: '7',  binarizar: true,  ancho: 1400, local: true, alfabeto: ALFABETO_CON_MES },
+    { psm: '6',  binarizar: true,  ancho: 1100 },   // sin restricción: nombre
+    { psm: '11', binarizar: true,  ancho: 1800, local: true, alfabeto: ALFABETO_NUMERICO }
   ];
+
+  /* ¿Vale la pena correr el OCR sobre este cuadro? -----------------------
+     Un pase de OCR cuesta uno o dos segundos. Gastarlo en un cuadro negro
+     —la cámara tapada, apuntando a la mesa, o en pleno reenfoque— es tirar
+     una parte del presupuesto de diez segundos que tiene el usuario.
+
+     El chequeo es deliberadamente tosco y barato: se arma una miniatura y se
+     mira el rango de grises. Si toda la imagen ocupa una franja angosta, no
+     hay texto que leer, sea porque está oscura o porque está fuera de foco.
+     Cuesta menos de un milisegundo y ahorra un intento entero.
+     -------------------------------------------------------------------- */
+  function cuadroSinContenido(fuente, roi) {
+    try {
+      const mini = preprocesar(fuente, { roi, anchoObjetivo: 80, binarizar: false });
+      if (!mini) return false;   // ante la duda, no se saltea
+      const ctx = mini.getContext('2d', { willReadFrequently: true });
+      const d = ctx.getImageData(0, 0, mini.width, mini.height).data;
+      if (!d || !d.length) return false;
+
+      let min = 255, max = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+        if (g < min) min = g;
+        if (g > max) max = g;
+      }
+      return (max - min) < 25;
+    } catch (e) {
+      return false;            // si el chequeo falla, se intenta igual
+    }
+  }
 
   function cargarImagen(src) {
     return new Promise((resolve, reject) => {
@@ -411,10 +476,19 @@ const AgenteCaptura = (() => {
     });
   }
 
-  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho, local }) {
+  async function ocrCrudo(imagen, { roi, psm, binarizar, ancho, local, alfabeto }) {
     const worker = await obtenerWorker();
     const entrada = preprocesar(imagen, { roi, anchoObjetivo: ancho, binarizar, local }) || imagen;
-    try { await worker.setParameters({ tessedit_pageseg_mode: psm }); } catch (e) { /* opcional */ }
+    try {
+      // El whitelist se limpia explícitamente cuando la estrategia no lo pide:
+      // el worker es persistente y el parámetro queda pegado entre llamadas.
+      // Sin esto, la estrategia que busca el NOMBRE heredaba el alfabeto de
+      // sólo dígitos de la vuelta anterior y no podía leer una sola letra.
+      await worker.setParameters({
+        tessedit_pageseg_mode: psm,
+        tessedit_char_whitelist: alfabeto || ''
+      });
+    } catch (e) { /* opcional */ }
     // Se piden `blocks` explícitamente: Tesseract.js v5 ya no devuelve
     // `lines`/`words` planos, y sin los bloques no hay forma de saber qué
     // línea es la más grande del envase (que es como se detecta el nombre).
@@ -1019,6 +1093,14 @@ const AgenteCaptura = (() => {
           // se tiene, se cierra el encuadre sobre la fecha para que quede más
           // grande al aumentar.
           const roiActual = nombreEntregado ? roiFecha : roi;
+
+          // Cuadro negro o fuera de foco: no se gasta un pase de OCR en él.
+          if (cuadroSinContenido(video, roiActual)) {
+            onTexto('');
+            await new Promise((r) => setTimeout(r, intervaloMs));
+            continue;
+          }
+
           const res = await procesarFoto(video, minConfianza, { roi: roiActual, estrategias: [est] });
 
           // Se emite SIEMPRE, aunque no haya fecha: es lo que le permite al

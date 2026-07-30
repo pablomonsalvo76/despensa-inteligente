@@ -2248,7 +2248,46 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => Orquestador.runCycle('chequeo periódico'), 60000);
   }
 
+  /* ---- Versión del build a la vista -----------------------------------
+     Sin esto no hay forma de saber, desde el teléfono, si lo que se está
+     probando es el código recién publicado o una versión que el service
+     worker dejó cacheada. Media hora reportando un bug ya corregido es un
+     costo real, y se evita mostrando un número.
+     -------------------------------------------------------------------- */
+  function mostrarBuild(texto) {
+    const el = find('about-build');
+    if (el) el.innerHTML = `Build: <strong>${escapeHtml(texto)}</strong>`;
+  }
+
   if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (ev) => {
+      if (ev.data && ev.data.tipo === 'version') mostrarBuild(ev.data.cache);
+    });
+
+    navigator.serviceWorker.ready.then((reg) => {
+      const activo = reg.active || navigator.serviceWorker.controller;
+      if (activo) activo.postMessage('version');
+      else mostrarBuild('sin service worker activo');
+    }).catch(() => mostrarBuild('no disponible'));
+
+    const btnAct = find('about-actualizar');
+    if (btnAct) {
+      btnAct.addEventListener('click', async () => {
+        toast('Buscando una versión nueva…');
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (!reg) { toast('No hay service worker registrado.'); return; }
+          await reg.update();
+          // `skipWaiting` ya está en el sw, así que alcanza con recargar
+          // para que tome el control la versión nueva si la hubiera.
+          toast('Listo. Recargando…');
+          setTimeout(() => location.reload(), 800);
+        } catch (e) {
+          toast('No se pudo verificar: ' + (e.message || e));
+        }
+      });
+    }
+
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 });
