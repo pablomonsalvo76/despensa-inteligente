@@ -543,6 +543,82 @@ const AgenteCaptura = (() => {
      -------------------------------------------------------------------- */
   const RUIDO_NOMBRE = /(ingredient|informaci|nutricion|contenido neto|peso neto|industria|argentin|conservar|mantener|refriger|una vez abierto|lote|vto|vence|consumir|antes de|elaborad|envasad|valor energ|prote|grasa|sodio|az[uú]car|carbohidrat|porci|www|http|\.com|\.ar|sin tacc|libre de gluten|apto para|rnpa|rne|c[oó]d|barra|kcal|gramos)/i;
 
+  /* ---- Qué ES el producto, no qué palabra es más grande ----------------
+     La versión anterior se quedaba con la línea de mayor altura del envase.
+     Suena razonable y falla en el caso más común: en un frasco de mayonesa
+     Hellmann's la palabra más grande es "CLÁSICA", que es el descriptor de
+     variante. El sistema guardaba "Clásica" como nombre del producto.
+
+     No es sólo un nombre feo. El Agente Cocinero matchea ingredientes por
+     nombre, así que un producto llamado "Clásica" no entra en NINGUNA
+     receta: queda inerte en la despensa, que es exactamente lo contrario
+     de lo que la app promete.
+
+     El criterio nuevo: buscar el SUSTANTIVO DEL ALIMENTO en todo el texto
+     leído —no sólo en las líneas grandes— y usar el tamaño únicamente para
+     desempatar la marca. Un envase puede tener la marca enorme y el tipo de
+     producto en letra chica; lo que importa para esta app es el tipo.
+     -------------------------------------------------------------------- */
+
+  // Sustantivos de alimento con su categoría. Incluye a propósito los 35
+  // ingredientes que conoce el recetario: si el escaneo devuelve uno de
+  // ellos, el producto entra directo en el motor de recetas.
+  const TIPOS_PRODUCTO = {
+    // Lácteos
+    leche: 'lacteos', yogur: 'lacteos', queso: 'lacteos', manteca: 'lacteos',
+    crema: 'lacteos', ricota: 'lacteos', dulce_de_leche: 'lacteos',
+    // Cereales y secos
+    arroz: 'cereales', fideos: 'cereales', pasta: 'cereales', harina: 'cereales',
+    avena: 'cereales', pan: 'cereales', galletitas: 'cereales', polenta: 'cereales',
+    lentejas: 'cereales', garbanzos: 'cereales', porotos: 'cereales',
+    pan_rallado: 'cereales', granola: 'cereales', cereal: 'cereales',
+    // Carnes
+    carne: 'carnes', pollo: 'carnes', pescado: 'carnes', atun: 'carnes',
+    jamon: 'carnes', chorizo: 'carnes', milanesa: 'carnes', salchicha: 'carnes',
+    // Verduras y frutas
+    papa: 'verduras', cebolla: 'verduras', tomate: 'verduras', zanahoria: 'verduras',
+    zapallito: 'verduras', zapallo: 'verduras', lechuga: 'verduras', ajo: 'verduras',
+    apio: 'verduras', banana: 'frutas', manzana: 'frutas', naranja: 'frutas',
+    uva: 'frutas', limon: 'frutas',
+    // Huevos
+    huevo: 'huevos', huevos: 'huevos',
+    // Conservas y condimentos
+    mayonesa: 'conservas', ketchup: 'conservas', mostaza: 'conservas',
+    salsa: 'conservas', pure: 'conservas', mermelada: 'conservas',
+    aceite: 'conservas', vinagre: 'conservas', sal: 'conservas',
+    azucar: 'conservas', caldo: 'conservas', canela: 'conservas',
+    // Bebidas
+    agua: 'bebidas', gaseosa: 'bebidas', jugo: 'bebidas', vino: 'bebidas',
+    cerveza: 'bebidas', cafe: 'bebidas', te: 'bebidas', yerba: 'bebidas'
+  };
+
+  // Adjetivos de variante. Nunca son el producto, por grandes que estén
+  // impresos. Esta lista es la que resuelve el caso "CLÁSICA".
+  const DESCRIPTORES = new Set([
+    'clasica', 'clasico', 'original', 'tradicional', 'light', 'diet', 'zero',
+    'cero', 'suave', 'intenso', 'premium', 'extra', 'super', 'especial',
+    'natural', 'casero', 'casera', 'artesanal', 'selecto', 'selecta',
+    'entera', 'entero', 'descremada', 'descremado', 'semi', 'fresco', 'fresca',
+    'nuevo', 'nueva', 'grande', 'chico', 'familiar', 'individual', 'pack',
+    'sabor', 'con', 'sin', 'de', 'la', 'el', 'los', 'las', 'y', 'en'
+  ]);
+
+  const normalizarPalabra = (s) => String(s).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // saca tildes
+    .replace(/[^a-z]/g, '');
+
+  /** Busca un sustantivo de alimento en el texto completo del envase. */
+  function detectarTipo(textoCompleto) {
+    const palabras = String(textoCompleto).split(/\s+/).map(normalizarPalabra).filter(Boolean);
+    for (const p of palabras) {
+      if (TIPOS_PRODUCTO[p]) return { tipo: p, categoria: TIPOS_PRODUCTO[p] };
+      // Plurales simples: "fideos" ya está, pero "quesos" o "huevos" no.
+      const sing = p.replace(/e?s$/, '');
+      if (sing.length >= 3 && TIPOS_PRODUCTO[sing]) return { tipo: sing, categoria: TIPOS_PRODUCTO[sing] };
+    }
+    return null;
+  }
+
   function limpiarNombre(s) {
     return s
       .replace(/[^0-9a-zA-ZáéíóúüñÁÉÍÓÚÜÑ %.\-]/g, ' ')
@@ -569,10 +645,40 @@ const AgenteCaptura = (() => {
 
     if (!lineas.length) return null;
 
-    lineas.sort((a, b) => (b.alto - a.alto) || (b.conf - a.conf));
-    const mejor = lineas[0];
-    if (!mejor.alto) return null;
-    return { texto: titular(mejor.texto), confianza: mejor.conf / 100 };
+    // 1) ¿Qué alimento es? Se busca en TODO el texto, no sólo en lo grande:
+    //    muchos envases traen la marca enorme y el tipo en letra chica.
+    const hallazgo = detectarTipo(lineas.map((l) => l.texto).join(' '));
+
+    // 2) La marca sí se elige por tamaño, pero descartando descriptores de
+    //    variante y la línea que contiene al propio tipo de producto.
+    const candidatasMarca = lineas
+      .filter((l) => {
+        const palabras = l.texto.split(/\s+/).map(normalizarPalabra).filter(Boolean);
+        if (!palabras.length) return false;
+        if (palabras.every((p) => DESCRIPTORES.has(p))) return false;      // "Clásica"
+        if (hallazgo && palabras.some((p) => p === hallazgo.tipo)) return false; // ya es el tipo
+        return true;
+      })
+      .sort((a, b) => (b.alto - a.alto) || (b.conf - a.conf));
+
+    const marca = candidatasMarca[0];
+
+    if (hallazgo) {
+      // "Mayonesa Hellmanns" — el sustantivo primero, que es lo que después
+      // usa el Cocinero para matchear, y la marca como calificador.
+      const texto = marca ? `${hallazgo.tipo} ${marca.texto}` : hallazgo.tipo;
+      return {
+        texto: titular(texto),
+        tipo: hallazgo.tipo,
+        categoria: hallazgo.categoria,
+        confianza: marca ? Math.max(0.75, marca.conf / 100) : 0.75
+      };
+    }
+
+    // 3) Sin tipo reconocido se cae al criterio viejo —la línea más grande—
+    //    pero al menos ya no puede devolver un descriptor suelto.
+    if (!marca || !marca.alto) return null;
+    return { texto: titular(marca.texto), confianza: marca.conf / 100 };
   }
 
   function armarISO(anio, mes, dia) {

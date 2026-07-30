@@ -951,6 +951,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.nombreDetectado && campoNombre && !campoNombre.value.trim()) {
         campoNombre.value = res.nombreDetectado.texto;
         avisoNombre = ` Nombre leído: "${res.nombreDetectado.texto}".`;
+
+        // Si el agente reconoció QUÉ alimento es (no sólo qué letras leyó),
+        // también sabe a qué categoría pertenece: se completa sola. Nunca
+        // pisa una categoría que el usuario ya haya elegido.
+        const campoCat = find('f-category');
+        if (res.nombreDetectado.categoria && campoCat && !campoCat.value) {
+          campoCat.value = res.nombreDetectado.categoria;
+          avisoNombre += ` Categoría: ${res.nombreDetectado.categoria}.`;
+        }
       }
 
       // Cada situación necesita un mensaje distinto: antes todo caía en
