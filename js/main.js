@@ -608,6 +608,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     set('auto-start', 'hidden', true);
     set('auto-stop', 'hidden', false);
+
+    // La linterna se ofrece recién cuando la cámara arrancó y sólo si el
+    // dispositivo la expone: mostrar un botón que no hace nada es peor que
+    // no mostrarlo. Se consulta con un margen, porque el track tarda un
+    // instante en publicar sus capacidades.
+    setTimeout(async () => {
+      const stream = streamDelLector('auto-reader');
+      const track = stream && stream.getVideoTracks()[0];
+      let tieneLinterna = false;
+      try { tieneLinterna = !!(track && track.getCapabilities && track.getCapabilities().torch); } catch (e) { /* no soportado */ }
+      set('auto-torch', 'hidden', !tieneLinterna);
+      if (tieneLinterna) set('auto-torch', 'textContent', 'Linterna');
+    }, 900);
     pasoEstado('step-codigo', 'buscando', 'buscando…');
     pasoEstado('step-nombre', '', 'en espera');
     pasoEstado('step-fecha', '', 'en espera');
@@ -615,7 +628,9 @@ document.addEventListener('DOMContentLoaded', () => {
     anunciar('Paso 1 de 2', 'Apuntá al código de barras');
     set('auto-status', 'textContent', 'Cámara activa. Si el producto no tiene código, esperá unos segundos y paso solo a leer el envase.');
 
-    autoScanner = new Html5Qrcode('auto-reader');
+    // La config de formatos va acá, en el constructor: pasarla en start() no
+    // tiene efecto (la librería la lee una sola vez, al construir el shim).
+    autoScanner = new Html5Qrcode('auto-reader', configLector());
 
     try {
       await autoScanner.start(
@@ -626,8 +641,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // el que después alimenta el OCR continuo de la fecha, así que si el
         // stream abre en 640×480 la fecha no se lee nunca.
         {
-          fps: 10,
-          qrbox: { width: 260, height: 160 },
+          // Con 4 formatos en vez de 17 y sin el pase espejado, cada cuadro
+          // cuesta bastante menos: se puede muestrear más seguido, que es
+          // lo que hace que "encuentre" el código mientras uno lo mueve.
+          fps: 15,
+          qrbox: recuadroCodigo,
+          disableFlip: true,
           videoConstraints: VIDEO_CONSTRAINTS
         },
         async (codigo) => {
@@ -745,6 +764,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function detenerEscanerAuto() {
     AgenteCaptura.detenerEscaneo();
+
+    // La linterna se apaga ANTES de soltar la cámara: si el track muere con
+    // el torch prendido, en varios Android el LED queda encendido hasta que
+    // otra app toma la cámara. Es un bug molesto y fácil de evitar.
+    if (linternaEncendida) {
+      alternarLinterna(streamDelLector('auto-reader'), false).catch(() => {});
+      linternaEncendida = false;
+      set('auto-torch', 'textContent', 'Linterna');
+    }
+    set('auto-torch', 'hidden', true);
+
     if (autoScanner) {
       autoScanner.stop().catch(() => {});
       autoScanner = null;
@@ -782,10 +812,11 @@ document.addEventListener('DOMContentLoaded', () => {
       cont.id = 'qr-reader-container';
       video.parentNode.insertBefore(cont, video);
     }
-    qrScanner = new Html5Qrcode('qr-reader-container');
+    qrScanner = new Html5Qrcode('qr-reader-container', configLector());
     Html5Qrcode.getCameras().then((cams) => {
       if (!cams || !cams.length) { toast('No se detectó cámara.'); return; }
-      qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 140 } },
+      qrScanner.start({ facingMode: 'environment' },
+        { fps: 15, qrbox: recuadroCodigo, disableFlip: true, videoConstraints: VIDEO_CONSTRAINTS },
         (texto) => {
           $('s-barcode').value = texto;
           toast(`Código detectado: ${texto}`);
@@ -840,6 +871,86 @@ document.addEventListener('DOMContentLoaded', () => {
       { focusDistance: { ideal: 0 } }   // sesgo hacia macro: el envase está cerca
     ]
   };
+
+  /* ===== Configuración del lector de códigos ============================
+     Dos ajustes que explican por qué antes había que "buscarle la posición"
+     al producto. Los dos se verificaron leyendo el código de html5-qrcode
+     2.3.8, que es la versión que carga el index.
+
+     1) FORMATOS. `formatsToSupport` se pasa al CONSTRUCTOR y, si no se pasa
+        nada, la librería habilita LOS 17 formatos que conoce: QR, Aztec,
+        Codabar, Code 39/93/128, Data Matrix, MaxiCode, ITF, PDF417, RSS...
+        Un producto de almacén sólo puede tener EAN-13, EAN-8, UPC-A o
+        UPC-E. Estábamos pagando el costo de buscar trece simbologías que
+        es imposible que aparezcan.
+
+     2) FLIP. `disableFlip` viene en false. En el código, cada vez que un
+        cuadro NO decodifica, la librería espeja el canvas y lo decodifica
+        DE NUEVO (html5-qrcode.js:579). O sea: mientras el usuario busca la
+        posición —cuando todos los cuadros fallan— cada cuadro cuesta el
+        doble. Y el espejado sólo sirve para códigos vistos en un espejo,
+        que no es el caso de un envase.
+
+     Lo que NO hacía falta tocar: `useBarCodeDetectorIfSupported` ya viene
+     en true por defecto, así que el detector nativo del navegador (mucho
+     más rápido que ZXing) ya se estaba usando donde existe.
+     ===================================================================== */
+  function formatosDeProducto() {
+    if (typeof Html5QrcodeSupportedFormats === 'undefined') return undefined;
+    return [
+      Html5QrcodeSupportedFormats.EAN_13,   // el estándar en góndola
+      Html5QrcodeSupportedFormats.EAN_8,    // envases chicos
+      Html5QrcodeSupportedFormats.UPC_A,    // importados de EE.UU.
+      Html5QrcodeSupportedFormats.UPC_E
+    ];
+  }
+
+  function configLector() {
+    const formatos = formatosDeProducto();
+    return formatos ? { formatsToSupport: formatos, useBarCodeDetectorIfSupported: true } : undefined;
+  }
+
+  /* Recuadro de lectura. Antes era fijo en píxeles (260×160), que en un
+     teléfono angosto queda enorme y en uno ancho, chico. Como función se
+     adapta al visor y mantiene la proporción apaisada que tiene un código
+     de barras: ancho y bajo. Recortar también acelera, porque la librería
+     decodifica sólo ese rectángulo. */
+  function recuadroCodigo(anchoVisor, altoVisor) {
+    const ancho = Math.floor(Math.min(anchoVisor * 0.85, 420));
+    const alto = Math.floor(Math.min(altoVisor * 0.45, ancho * 0.55));
+    return { width: Math.max(120, ancho), height: Math.max(80, alto) };
+  }
+
+  /** Linterna: en góndola y en alacena la falta de luz es la causa #1 de
+      que un código no lea. Sólo se ofrece si la cámara la expone. */
+  async function alternarLinterna(stream, encender) {
+    const track = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+    if (!track || !track.getCapabilities) return false;
+    let caps = {};
+    try { caps = track.getCapabilities(); } catch (e) { return false; }
+    if (!caps.torch) return false;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !!encender }] });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function streamDelLector(contenedorId) {
+    const v = document.querySelector(`#${contenedorId} video`);
+    return v && v.srcObject ? v.srcObject : null;
+  }
+
+  let linternaEncendida = false;
+  const btnTorch = find('auto-torch');
+  if (btnTorch) {
+    btnTorch.addEventListener('click', async () => {
+      const stream = streamDelLector('auto-reader');
+      const ok = await alternarLinterna(stream, !linternaEncendida);
+      if (!ok) { toast('Esta cámara no permite controlar la linterna.'); return; }
+      linternaEncendida = !linternaEncendida;
+      btnTorch.textContent = linternaEncendida ? 'Apagar linterna' : 'Linterna';
+    });
+  }
 
   /**
    * Pide foco continuo sobre un stream ya abierto. Se hace aparte del
