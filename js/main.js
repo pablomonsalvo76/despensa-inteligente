@@ -622,11 +622,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tieneLinterna) set('auto-torch', 'textContent', 'Linterna');
     }, 900);
     pasoEstado('step-codigo', 'buscando', 'buscando…');
-    pasoEstado('step-nombre', '', 'en espera');
-    pasoEstado('step-fecha', '', 'en espera');
+    pasoEstado('step-nombre', 'buscando', 'buscando…');
+    pasoEstado('step-fecha', 'buscando', 'buscando…');
     encuadreFecha(false);
-    anunciar('Paso 1 de 2', 'Apuntá al código de barras');
-    set('auto-status', 'textContent', 'Cámara activa. Si el producto no tiene código, esperá unos segundos y paso solo a leer el envase.');
+    anunciar('Mostrame el producto', 'Código, nombre o fecha: leo lo que encuentre');
+    set('auto-status', 'textContent', 'Cámara activa. Movelo despacio: no hay un orden obligatorio, voy completando lo que vaya reconociendo.');
 
     // La config de formatos va acá, en el constructor: pasarla en start() no
     // tiene efecto (la librería la lee una sola vez, al construir el shim).
@@ -659,10 +659,14 @@ document.addEventListener('DOMContentLoaded', () => {
           vibrar(60);
           pasoEstado('step-codigo', 'listo', codigo);
           set('s-barcode', 'value', codigo);
-          anunciar('Paso 2 de 2', 'Ahora apuntá a la FECHA de vencimiento', true);
+          anunciar('Código leído', 'Seguí mostrándome el envase: falta la fecha', true);
 
           const info = await AgenteCaptura.resolverGTIN(codigo);
           if (info.name) {
+            // El dato del código PISA al del OCR a propósito, aunque el OCR
+            // haya llegado antes: un EAN-13 trae verificación y devuelve el
+            // nombre oficial del producto, mientras que el OCR puede leer mal
+            // sin que nadie se entere. Entre los dos, gana el verificable.
             set('f-name', 'value', info.name);
             pasoEstado('step-codigo', 'listo', info.name);
             pasoEstado('step-nombre', 'listo', 'desde el código');
@@ -674,15 +678,31 @@ document.addEventListener('DOMContentLoaded', () => {
         () => {} // frames sin código: silencioso
       );
 
-      // Producto sin código legible (frutas, verduras, envases arrugados):
-      // a los 6 segundos el agente deja de esperar y pasa a leer el envase,
-      // de donde saca el nombre y la fecha por OCR.
+      /* Lectura EN PARALELO, no en secuencia.
+         -----------------------------------------------------------------
+         Antes esto esperaba SEIS segundos antes de intentar leer el envase.
+         Durante ese rato, si el usuario mostraba el frente del producto en
+         vez del código, la pantalla no hacía nada — y el cartel decía
+         "Paso 1 de 2", que enseñaba un orden obligatorio que no existe.
+
+         El código de barras nunca fue obligatorio: es preferible cuando
+         aparece, porque es verificable, pero el envase alcanza. Así que el
+         OCR arranca casi enseguida y los dos lectores conviven sobre el
+         mismo <video> (no se puede abrir dos cámaras en un teléfono).
+
+         Los dos segundos de ventaja no son un capricho: Tesseract es pesado
+         y compite por CPU con el decodificador. Si el código está a la
+         vista, en ese tiempo ya se leyó y el OCR arranca sin estorbar. Si
+         no está, la espera es corta y no se siente como una pausa muerta. */
       setTimeout(() => {
-        if (!autoScanner || codigoYaLeido || AgenteCaptura.estaEscaneando()) return;
-        pasoEstado('step-codigo', '', 'sin código');
-        anunciar('Paso 2 de 2', 'Apuntá al frente del envase: nombre y fecha', true);
+        if (!autoScanner || AgenteCaptura.estaEscaneando()) return;
+        if (!codigoYaLeido) {
+          // El lector de códigos NO se detiene: si el código aparece más
+          // tarde, se engancha igual y corrige el nombre leído por OCR.
+          pasoEstado('step-codigo', 'buscando', 'sigo buscándolo');
+        }
         arrancarOCRContinuo();
-      }, 6000);
+      }, 2000);
 
     } catch (err) {
       toast('No se pudo activar la cámara: ' + err);
