@@ -941,25 +941,59 @@ const AgenteCaptura = (() => {
    * @param {HTMLVideoElement} video  fuente de frames
    * @param {object} opciones
    *   buscarNombre         → true si el nombre todavía está vacío
-   *   onProgreso(i, max)   → feedback en pantalla
+   *   onProgreso(i, segsRestantes) → feedback en pantalla
+   *   onTexto(crudo)       → lo que la cámara está leyendo, en vivo
    *   onNombre(txt, conf)  → se leyó un nombre plausible
    *   onFecha(iso, conf, motivo) → se resolvió (o se agotó) la búsqueda
    *   minConfianza         → umbral para dar una fecha por buena
    *   intervaloMs          → respiro entre intentos (el OCR ocupa la CPU)
-   *   maxIntentos          → corta solo para no quemar batería
+   *   presupuestoMs        → techo de tiempo total del escaneo
+   *   intentosConfirmacion → vueltas extra para confirmar una lectura
    */
+  /* ---- Escaneo continuo de la fecha ------------------------------------
+     REESCRITO tras una prueba real que dejó el problema a la vista: el
+     usuario sostuvo el teléfono sobre un frasco durante el "intento 24 de
+     32" sin que pasara nada. Las cuentas explican por qué:
+
+       32 intentos × (OCR de ~2 s + 900 ms de espera) ≈ 90 segundos
+
+     Y aunque leyera bien la fecha, no la entregaba: exigía que apareciera
+     DOS VECES IDÉNTICA o con 85% de confianza. Un troquelado tenue casi
+     nunca llega a ese número, así que seguía girando con la respuesta ya
+     encontrada. Encima el texto crudo de cada vuelta se descartaba, así
+     que el usuario no veía absolutamente nada.
+
+     Tres cambios de criterio:
+
+     1) SE ACOTA POR TIEMPO, no por intentos. "Intento 24 de 32" no le dice
+        nada a nadie; diez segundos sí. Si en ese rato no salió, no va a
+        salir: lo que corresponde es soltar al usuario, no insistir.
+     2) LA FECHA SE OFRECE APENAS SE LEE. Antes se exigía confirmación y,
+        si no llegaba, igual se terminaba ofreciendo la misma lectura 90
+        segundos después. Se llega al mismo lugar, mucho antes. Queda una
+        ventana corta buscando la confirmación, que si aparece sube la
+        certeza; si no, se entrega igual para que el usuario la revise.
+     3) SE EMITE EL TEXTO CRUDO en cada vuelta. Ver qué está leyendo la
+        cámara es lo único que permite entender por qué falla — y le avisa
+        al usuario que el sistema está haciendo algo.
+     -------------------------------------------------------------------- */
   async function iniciarEscaneoContinuo(video, {
     buscarNombre = false,
     onProgreso = () => {}, onFecha = () => {}, onNombre = () => {},
-    minConfianza = 0.55, intervaloMs = 900, maxIntentos = 32,
+    onTexto = () => {},
+    minConfianza = 0.55, intervaloMs = 500,
+    presupuestoMs = 10000,        // techo duro: pasado esto se corta
+    intentosConfirmacion = 2,     // vueltas extra para confirmar una lectura
     roi = ROI_ESCANER, roiFecha = ROI_FECHA
   } = {}) {
     if (escaneoActivo) return;
     escaneoActivo = true;
     cancelado = false;
 
+    const arranque = Date.now();
     let intento = 0;
     let mejor = null;          // mejor lectura de fecha hasta el momento
+    let intentosDesdeHallazgo = 0;
     let nombreEntregado = !buscarNombre;
 
     // Se precarga el motor antes del primer intento para que el usuario vea
@@ -970,9 +1004,10 @@ const AgenteCaptura = (() => {
       return;
     }
 
-    while (escaneoActivo && intento < maxIntentos) {
+    while (escaneoActivo && (Date.now() - arranque) < presupuestoMs) {
       intento++;
-      onProgreso(intento, maxIntentos);
+      const restante = Math.max(0, presupuestoMs - (Date.now() - arranque));
+      onProgreso(intento, Math.ceil(restante / 1000));
 
       try {
         if (video.videoWidth) {
@@ -986,15 +1021,19 @@ const AgenteCaptura = (() => {
           const roiActual = nombreEntregado ? roiFecha : roi;
           const res = await procesarFoto(video, minConfianza, { roi: roiActual, estrategias: [est] });
 
+          // Se emite SIEMPRE, aunque no haya fecha: es lo que le permite al
+          // usuario ver que la cámara está leyendo algo, y lo que hace
+          // diagnosticable un fallo.
+          if (res.textoDetectado) onTexto(res.textoDetectado);
+
           if (!nombreEntregado && res.nombreDetectado && res.nombreDetectado.confianza >= 0.7) {
             nombreEntregado = true;
             onNombre(res.nombreDetectado.texto, res.nombreDetectado.confianza);
           }
 
           if (res.fechaDetectada) {
-            // Una fecha se da por buena si aparece dos veces igual, o si
-            // llega sola con confianza alta. Repetir la lectura es la mejor
-            // defensa contra un dígito mal reconocido.
+            // Repetir la lectura sigue siendo la mejor defensa contra un
+            // dígito mal reconocido, así que si se confirma se corta ya.
             if (mejor && mejor.fecha === res.fechaDetectada) {
               escaneoActivo = false;
               onFecha(res.fechaDetectada, Math.max(mejor.confianza, res.confianza), 'confirmada');
@@ -1005,7 +1044,20 @@ const AgenteCaptura = (() => {
               onFecha(res.fechaDetectada, res.confianza, 'alta_confianza');
               return;
             }
+            if (!mejor) intentosDesdeHallazgo = 0;
             mejor = { fecha: res.fechaDetectada, confianza: res.confianza };
+          }
+
+          // Ya hay una lectura y la confirmación no llegó en un par de
+          // vueltas: se entrega igual. Antes esto esperaba a agotar los 32
+          // intentos para terminar ofreciendo exactamente lo mismo.
+          if (mejor) {
+            intentosDesdeHallazgo++;
+            if (intentosDesdeHallazgo > intentosConfirmacion) {
+              escaneoActivo = false;
+              onFecha(mejor.fecha, mejor.confianza, 'sin_confirmar');
+              return;
+            }
           }
         }
       } catch (e) {

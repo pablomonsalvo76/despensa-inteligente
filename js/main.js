@@ -738,9 +738,21 @@ document.addEventListener('DOMContentLoaded', () => {
     AgenteCaptura.iniciarEscaneoContinuo(video, {
       buscarNombre: faltaNombre,
 
-      onProgreso: (i, max) => {
+      // Se cuenta el tiempo que queda, no el número de intento: "intento 24
+      // de 32" no le dice nada a nadie y sugiere una espera sin fin.
+      onProgreso: (i, segundosRestantes) => {
         set('auto-status', 'textContent',
-          `Leyendo el envase… (intento ${i} de ${max}). Acercá la cámara al texto, quieta y con buena luz.`);
+          `Leyendo la fecha… ${segundosRestantes} s. Si no sale, escribila abajo — es más rápido.`);
+      },
+
+      // Mostrar el texto crudo cumple dos funciones: le avisa al usuario que
+      // el sistema está haciendo algo, y es lo único que permite entender
+      // por qué falla una lectura.
+      onTexto: (texto) => {
+        const cont = find('auto-crudo');
+        if (!cont || !texto) return;
+        cont.hidden = false;
+        cont.textContent = `La cámara lee: "${texto.replace(/\s+/g, ' ').trim().slice(0, 80)}"`;
       },
 
       // El nombre se lee del frente del envase: es el texto más grande.
@@ -804,6 +816,19 @@ document.addEventListener('DOMContentLoaded', () => {
     set('auto-start', 'hidden', false);
     set('auto-stop', 'hidden', true);
   }
+
+  /* Salida manual, disponible DESDE EL PRINCIPIO y no como premio consuelo.
+     Escribir "23/01/27" lleva cuatro segundos; pelearse con el OCR de un
+     troquelado tenue puede llevar un minuto y terminar igual en el teclado.
+     Que la opción rápida esté a la vista no es rendirse: es respetar el
+     tiempo del usuario, que es justamente lo que la app promete cuidar. */
+  on('auto-manual', 'click', () => {
+    detenerEscanerAuto();
+    ir('sc-agregar');
+    const campo = find('f-expiry');
+    if (campo) { campo.focus(); try { campo.showPicker && campo.showPicker(); } catch (e) { /* no soportado */ } }
+    set('auto-status', 'textContent', '');
+  });
 
   on('auto-start', 'click', iniciarEscanerAuto);
   on('auto-stop', 'click', () => {
@@ -941,18 +966,49 @@ document.addEventListener('DOMContentLoaded', () => {
     return { width: Math.max(120, ancho), height: Math.max(80, alto) };
   }
 
-  /** Linterna: en góndola y en alacena la falta de luz es la causa #1 de
-      que un código no lea. Sólo se ofrece si la cámara la expone. */
+  /* Linterna --------------------------------------------------------------
+     En alacena y góndola la falta de luz es la causa principal de que un
+     código no lea.
+
+     La versión anterior daba por exitoso que `applyConstraints` resolviera,
+     y eso NO alcanza: las restricciones dentro de `advanced` son de "mejor
+     esfuerzo" según la especificación, así que el navegador puede aceptar
+     la promesa sin encender nada. El botón cambiaba de texto y la linterna
+     seguía apagada.
+
+     Ahora se VERIFICA leyendo `getSettings().torch` después de aplicar, y
+     si no tomó se prueba la forma no estándar —la restricción suelta, sin
+     `advanced`— que es la que funciona en varios Android. Sólo se informa
+     éxito cuando el dispositivo confirma que quedó encendida. */
   async function alternarLinterna(stream, encender) {
     const track = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
-    if (!track || !track.getCapabilities) return false;
+    if (!track || !track.applyConstraints) return { ok: false, motivo: 'sin_track' };
+
     let caps = {};
-    try { caps = track.getCapabilities(); } catch (e) { return false; }
-    if (!caps.torch) return false;
+    try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) { /* no soportado */ }
+    if (!caps.torch) return { ok: false, motivo: 'sin_soporte' };
+
+    const quedoEncendida = () => {
+      try { return track.getSettings ? track.getSettings().torch === true : null; }
+      catch (e) { return null; }
+    };
+
+    // 1) La forma estándar.
     try {
       await track.applyConstraints({ advanced: [{ torch: !!encender }] });
-      return true;
-    } catch (e) { return false; }
+      const estado = quedoEncendida();
+      // `null` = el navegador no informa el estado; se confía y se sigue.
+      if (estado === null || estado === !!encender) return { ok: true, motivo: 'estandar' };
+    } catch (e) { /* se prueba la alternativa */ }
+
+    // 2) La forma que aceptan varios Android: la restricción suelta.
+    try {
+      await track.applyConstraints({ torch: !!encender });
+      const estado = quedoEncendida();
+      if (estado === null || estado === !!encender) return { ok: true, motivo: 'directa' };
+    } catch (e) { /* nada más que probar */ }
+
+    return { ok: false, motivo: 'rechazada' };
   }
 
   function streamDelLector(contenedorId) {
@@ -965,8 +1021,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnTorch) {
     btnTorch.addEventListener('click', async () => {
       const stream = streamDelLector('auto-reader');
-      const ok = await alternarLinterna(stream, !linternaEncendida);
-      if (!ok) { toast('Esta cámara no permite controlar la linterna.'); return; }
+      const r = await alternarLinterna(stream, !linternaEncendida);
+      if (!r.ok) {
+        const motivos = {
+          sin_track: 'La cámara todavía no está lista. Probá de nuevo en un segundo.',
+          sin_soporte: 'Este dispositivo no expone control de linterna al navegador.',
+          rechazada: 'El navegador rechazó encender la linterna. En iPhone, Safari no lo permite.'
+        };
+        toast(motivos[r.motivo] || 'No se pudo controlar la linterna.');
+        return;
+      }
       linternaEncendida = !linternaEncendida;
       btnTorch.textContent = linternaEncendida ? 'Apagar linterna' : 'Linterna';
     });
