@@ -209,7 +209,34 @@ const AgenteCaptura = (() => {
 
     // Se agranda el recorte hasta ~900 px de ancho: el OCR necesita que los
     // caracteres tengan cierto tamaño, pero pasarse sólo cuesta tiempo.
-    const escala = Math.min(3, Math.max(1, anchoObjetivo / sw));
+    /* La escala tiene que poder ACHICAR, no sólo agrandar.
+       -------------------------------------------------------------------
+       Ésta era la falla de fondo. `Math.max(1, ...)` impedía bajar de 1, así
+       que el canvas nunca era más chico que el recorte de origen. Con la
+       cámara en 4K y ROI_FECHA, eso son 2918×778 px = 2,3 Mpx en CADA
+       intento, sin importar el anchoObjetivo que se pidiera.
+
+       Dos consecuencias, y las dos explican el comportamiento observado:
+
+       · COSTO. Cada pasada de preprocesado recorre 2,3 millones de píxeles
+         varias veces, sobre el hilo principal. El cierre morfológico sobre
+         ese tamaño medía 1,5 segundos por intento — con el navegador
+         congelado, incluido el lector de código y los botones.
+       · CALIDAD. Tesseract recibía una franja enorme donde la fecha ocupaba
+         el 0,16% de la imagen. Subir la cámara a 4K nos dio más píxeles
+         absolutos sobre el troquelado, pero la fecha siguió igual de chica
+         EN PROPORCIÓN, que es lo que el motor mira. Los caracteres seguían
+         teniendo pocas decenas de píxeles dentro de una imagen inmensa.
+
+       Ahora la escala se calcula libre y se acota el total de píxeles: se
+       normaliza el recorte a un tamaño de trabajo razonable, se agrande o
+       se achique para llegar ahí. */
+    let escala = anchoObjetivo / sw;
+    const MAX_PIXELES = 900000;                    // techo de trabajo
+    if (sw * sh * escala * escala > MAX_PIXELES) {
+      escala = Math.sqrt(MAX_PIXELES / (sw * sh));
+    }
+    escala = Math.max(0.15, Math.min(4, escala));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(sw * escala);
     canvas.height = Math.round(sh * escala);
@@ -369,7 +396,17 @@ const AgenteCaptura = (() => {
     }
   }
 
+  // Techo de seguridad: el cierre es O(n·r) y sobre un canvas grande
+  // congela el hilo principal. Medido: 1,5 s sobre 1,8 Mpx. Con el recorte
+  // acotado nunca debería acercarse, pero la guarda evita que un cambio de
+  // ROI vuelva a colgar la app sin que nadie se entere.
+  const MAX_PX_CIERRE = 400000;
+
   function cerrarPuntos(d, w, h, radio = 3) {
+    if (w * h > MAX_PX_CIERRE) {
+      console.warn('cierre omitido: canvas de %d px supera el techo', w * h);
+      return;
+    }
     filtroRango(d, w, h, radio, true);            // engorda lo oscuro
     filtroRango(d, w, h, Math.max(1, radio - 2), false);  // recorta el exceso
   }
@@ -484,8 +521,8 @@ const AgenteCaptura = (() => {
   const ESTRATEGIAS = [
     // Las dos primeras llevan cierre morfológico: es lo único que hizo leer
     // el troquelado real en las mediciones sobre la foto del envase.
-    { psm: '7',  binarizar: false, ancho: 1600, alfabeto: ALFABETO_NUMERICO, cerrar: 3 },
-    { psm: '7',  binarizar: false, ancho: 2000, alfabeto: ALFABETO_NUMERICO, cerrar: 4 },
+    { psm: '7',  binarizar: false, ancho: 1000, alfabeto: ALFABETO_NUMERICO, cerrar: 2 },
+    { psm: '7',  binarizar: false, ancho: 1400, alfabeto: ALFABETO_NUMERICO, cerrar: 3 },
     { psm: '7',  binarizar: true,  ancho: 1400, alfabeto: ALFABETO_NUMERICO },
     // Umbral local: para tapas curvas y frascos, donde hay brillo de un lado
     // y sombra del otro y un umbral global no puede servir a los dos.
@@ -1213,7 +1250,20 @@ const AgenteCaptura = (() => {
   // Encuadre angosto del paso de la fecha: coincide con `.scan-stage.paso-fecha
   // .scan-frame` en el CSS (inset 32% 12%). Cuanto menos envase entra, más
   // grande queda la fecha tras el aumento y mejor la lee el OCR.
-  const ROI_FECHA = { x: 0.12, y: 0.32, w: 0.76, h: 0.36 };
+  /* Encuadre de la fecha — MUCHO más angosto que antes.
+     -----------------------------------------------------------------------
+     Era 76% × 36% del cuadro: una franja enorme donde la fecha, medida sobre
+     la foto real de un envase, ocupaba menos del 1%. Tesseract en modo "una
+     sola línea" recibía casi todo fondo y algo de troquelado perdido en el
+     medio.
+
+     Una fecha de vencimiento es ANCHA Y BAJA: ocho o diez caracteres en un
+     renglón. El encuadre nuevo tiene esa proporción, y al ser chico permite
+     AGRANDARLO de verdad en el preprocesado —que es lo que le da tamaño a
+     los caracteres— en vez de trabajar sobre el recorte a tamaño original.
+     La contrapartida es que el usuario tiene que apuntar con más precisión;
+     el recuadro de la pantalla se lo indica. */
+  const ROI_FECHA = { x: 0.18, y: 0.40, w: 0.64, h: 0.16 };
 
   /**
    * Escáner continuo: la cámara queda mirando el envase y el agente insiste
