@@ -84,6 +84,20 @@ const casos = [
   ['23-01-27',                  'cons. pref. 23-01-27',                   '2027-01-23'],
   ['23.01.27',                  'vence 23.01.27',                         '2027-01-23'],
 
+  // --- REGRESIÓN: mes/año, el formato más común en despensa ---
+  // No estaba contemplado en ningún patrón: el de dd/mm leía "03/27" como
+  // día 3 del mes 27 y lo descartaba por mes inválido.
+  ['MM/AA suelto',              '03/27',                                  '2027-03-31'],
+  ['MM/AA con vto',             'vto 03/27',                              '2027-03-31'],
+  ['MM/AA con cons. pref.',     'CONS. PREF. 03/27',                      '2027-03-31'],
+  ['MM/AAAA',                   '03/2027',                                '2027-03-31'],
+  ['MM-AA con guion',           '03-27',                                  '2027-03-31'],
+  ['MM AA con espacio',         '03 27',                                  '2027-03-31'],
+  ['MM/AA diciembre',           '12/26',                                  '2026-12-31'],
+  ['MM/AA junto a un lote',     'L2847 03/27',                            '2027-03-31'],
+  ['ambiguo sin clave → null',  'lote 03/07',                             null],
+  ['mes inválido en MM/AA',     '13/27',                                  null],
+
   // --- Meses en letras ---
   ['dd MMM yyyy',               'vto 20 AGO 2027',                        '2027-08-20'],
   ['dd MMM yy',                 'vto 20 ago 27',                          '2027-08-20'],

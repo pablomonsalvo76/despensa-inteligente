@@ -135,6 +135,41 @@ function chequear(desc, cond, detalle) {
 }
 
 /* ======================================================================
+   REGRESIÓN: la foto de la FECHA no debe aportar el nombre
+   ----------------------------------------------------------------------
+   Al fotografiar el vencimiento, el OCR arrastra el texto que rodea al
+   troquelado: "CONS. PREF.", el lote, la hora de envasado. Esas líneas
+   competían como candidatas a nombre y a veces ganaban.
+   ==================================================================== */
+{
+  const zonaFecha = ocr([
+    ['CONS. PREF.', 70],
+    ['03/27', 65],
+    ['L-2847', 55],
+    ['FAB. 03/26', 50]
+  ]);
+  const r = extraerNombre(zonaFecha);
+  chequear('la zona del troquelado no produce un nombre',
+    r === null, `devolvió "${r && r.texto}"`);
+
+  const casos = [
+    ['CONS. PREF. 03/27', 'abreviatura de consumo preferente'],
+    ['L-2847', 'código de lote'],
+    ['FAB 03/26', 'fecha de fabricación'],
+    ['EXP 12/28', 'expiry abreviado'],
+    ['03/27', 'la fecha sola'],
+    ['23/01/2027', 'fecha completa'],
+    ['H 14:35', 'hora de envasado']
+  ];
+  casos.forEach(([linea, desc]) => {
+    const res = extraerNombre(ocr([[linea, 80], ['Mayonesa', 25]]));
+    chequear(`no toma como nombre: ${desc}`,
+      res && !new RegExp(linea.split(/\s/)[0], 'i').test(res.texto),
+      `con "${linea}" devolvió "${res && res.texto}"`);
+  });
+}
+
+/* ======================================================================
    Ruido legal y nutricional: sigue filtrado
    ==================================================================== */
 {

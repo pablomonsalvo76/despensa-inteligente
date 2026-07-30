@@ -504,6 +504,52 @@ const AgenteCaptura = (() => {
         agregar(armarISO(m[2], mes, String(ultimoDia)), m.index);
       }
 
+      /* MM/AA y MM/AAAA — "03/27", "12/2026"
+         -------------------------------------------------------------------
+         Es de los formatos más usados en despensa (fideos, conservas, café)
+         y no estaba contemplado en ningún patrón. Peor: el patrón dd/mm de
+         más abajo leía "03/27" como día 3 del mes 27, lo descartaba por mes
+         inválido, y la fecha se perdía en silencio.
+
+         DESAMBIGUACIÓN: el problema es que "03/12" puede ser el 3 de
+         diciembre o marzo de 2012. La regla que lo resuelve sin adivinar es
+         mirar el SEGUNDO número: si es mayor que 12, no puede ser un mes, así
+         que es un año. Si es de 4 dígitos, tampoco hay duda. En esos casos
+         gana mes/año. Cuando ambos son ≤ 12 queda genuinamente ambiguo y se
+         deja pasar al patrón dd/mm, que ya exige una palabra clave cerca.
+
+         DÍA: se asume el ÚLTIMO del mes, igual que en "MMM yyyy". Es la
+         convención de envase —un producto marcado 03/27 se puede consumir
+         durante todo marzo— y evita alertar un mes antes de tiempo, que en
+         una app contra el desperdicio significaría tirar comida buena.
+
+         CUIDADO CON EL SOLAPAMIENTO: la primera versión de este patrón
+         matcheaba el "01/27" de adentro de "23/01/27" y generaba una fecha
+         competidora (fin de enero) que le ganaba a la real por ser posterior.
+         Por eso el carácter previo excluye también los separadores: si antes
+         del mes hay "/", "-" o ".", lo que estamos mirando es la cola de una
+         fecha completa y no un mes/año. Se resuelve con un grupo capturado y
+         no con lookbehind, que Safari viejo no soporta.
+
+         Y el carácter previo tiene que ser espacio o puntuación, NO una
+         letra: sobre el texto crudo del OCR —antes de corregir O↔0— en
+         "vto 3o/o7/27" la letra "o" servía de separador y el patrón leía
+         "7/27" como julio de 2027, devolviendo fin de julio y cortando la
+         búsqueda antes de llegar a la variante corregida, que traía la
+         fecha real (el 30). */
+      re = /(^|[\s:;,()])(\d{1,2})[\s\/\-.]{1,2}(\d{2}|\d{4})(?![\d\/\-.])/g;
+      while ((m = re.exec(t))) {
+        const mes = Number(m[2]);
+        const anioCrudo = m[3];
+        const anioNum = Number(anioCrudo);
+        if (mes < 1 || mes > 12) continue;
+        // Sólo cuando el año es inequívoco: 4 dígitos, o 2 dígitos > 12.
+        if (anioCrudo.length !== 4 && anioNum <= 12) continue;
+        const anio = anioCrudo.length === 4 ? anioNum : 2000 + anioNum;
+        const ultimoDia = new Date(anio, mes, 0).getDate();
+        agregar(armarISO(anio, mes, ultimoDia), m.index);
+      }
+
       // Compacto ddmmyy / ddmmyyyy. Sólo junto a una palabra clave: seis
       // dígitos sueltos son casi siempre un número de lote.
       re = /\b(\d{2})(\d{2})(\d{2}|\d{4})\b/g;
@@ -542,6 +588,26 @@ const AgenteCaptura = (() => {
      numerosas pero pequeñas.
      -------------------------------------------------------------------- */
   const RUIDO_NOMBRE = /(ingredient|informaci|nutricion|contenido neto|peso neto|industria|argentin|conservar|mantener|refriger|una vez abierto|lote|vto|vence|consumir|antes de|elaborad|envasad|valor energ|prote|grasa|sodio|az[uú]car|carbohidrat|porci|www|http|\.com|\.ar|sin tacc|libre de gluten|apto para|rnpa|rne|c[oó]d|barra|kcal|gramos)/i;
+
+  /* Ruido específico de la ZONA DE LA FECHA -----------------------------
+     Cuando el usuario fotografía el vencimiento, el OCR arrastra el texto
+     que rodea a la fecha: "CONS. PREF.", "FAB.", el número de lote, la
+     hora de envasado. Esas líneas competían como candidatas a nombre y a
+     veces ganaban, así que el producto terminaba llamándose con un pedazo
+     del troquelado.
+
+     `RUIDO_NOMBRE` no las agarraba porque busca palabras completas como
+     "consumir" y en el envase suelen venir abreviadas.
+     -------------------------------------------------------------------- */
+  const RUIDO_FECHA = /(cons\.?\s*pref|c\.?\s*prefer|f\.?\s*venc|f\.?\s*elab|fab\.?\b|env\.?\b|exp\.?\b|best\s*before|use\s*by|caduc|\bl\s*[-:]?\s*\d|\blote\b|\bl\.?\s*n|\bh\b\s*\d{1,2}[:.]\d{2})/i;
+
+  /** ¿Esta línea es (o contiene) una fecha? Entonces no es el nombre. */
+  function pareceFecha(texto) {
+    if (extraerFecha(texto)) return true;
+    // También descarta patrones con forma de fecha que no pasaron la
+    // validación de plausibilidad: siguen sin ser un nombre de producto.
+    return /\d{1,4}\s*[\/\-.]\s*\d{1,4}(\s*[\/\-.]\s*\d{1,4})?/.test(texto);
+  }
 
   /* ---- Qué ES el producto, no qué palabra es más grande ----------------
      La versión anterior se quedaba con la línea de mayor altura del envase.
@@ -641,7 +707,10 @@ const AgenteCaptura = (() => {
       .filter((l) => l.conf >= 65)
       .filter((l) => /[a-záéíóúñ]{3,}/i.test(l.texto))          // tiene palabras reales
       .filter((l) => l.texto.replace(/[^0-9]/g, '').length / l.texto.length < 0.3)
-      .filter((l) => !RUIDO_NOMBRE.test(l.texto));
+      .filter((l) => !RUIDO_NOMBRE.test(l.texto))
+      // Nada que venga de la zona del troquelado puede ser el nombre.
+      .filter((l) => !RUIDO_FECHA.test(l.texto))
+      .filter((l) => !pareceFecha(l.texto));
 
     if (!lineas.length) return null;
 
