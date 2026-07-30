@@ -554,20 +554,90 @@ const AgenteCaptura = (() => {
    * Busca la fecha en el texto y calcula la confianza a partir de las
    * palabras del OCR que la contienen.
    */
+  /* ---- ¿Esto TIENE FORMA de fecha? -------------------------------------
+     El orden estaba invertido. El sistema leía cualquier cosa y después
+     probaba si algún patrón matcheaba, así que apuntando a un mármol —donde
+     el OCR ve las motas como dígitos— llegaba a producir "8 - 774634" y se
+     ponía a buscarle una fecha adentro.
+
+     Una fecha impresa en un envase tiene una forma reconocible: es un
+     BLOQUE COMPACTO, con dos o tres grupos de dígitos y separadores
+     consistentes, todo junto. No son dígitos sueltos repartidos por la
+     imagen. Este chequeo exige esa forma ANTES de aceptar nada.
+
+     El `(?!\d)` del final no es cosmético: sin él, el ruido "8 - 774634"
+     pasaba el portón, porque "8 - 77" tiene forma de mes/año perfectamente
+     válida si uno ignora que después siguen más dígitos. Una fecha termina
+     donde termina el año; un número de lote, no.
+     -------------------------------------------------------------------- */
+  const FORMA_FECHA = new RegExp(
+    '(?:' +
+      '\\d{1,2}\\s?[\\/\\-.]\\s?\\d{1,2}\\s?[\\/\\-.]\\s?\\d{2,4}(?!\\d)' +  // 23/01/27
+      '|\\d{1,2}\\s?[\\/\\-.]\\s?\\d{2,4}(?!\\d)' +                          // 03/27
+      '|\\d{1,2}\\s?[a-z]{3}\\s?\\d{2,4}(?!\\d)' +                           // 20 ago 27
+      '|[a-z]{3}\\s?\\d{4}(?!\\d)' +                                         // dic 2026
+    ')', 'i');
+
+  function tieneFormaDeFecha(texto) {
+    return FORMA_FECHA.test(String(texto || ''));
+  }
+
+  /* Confianza y verificación estructural.
+     -----------------------------------------------------------------------
+     Además de la forma, se exige PROCEDENCIA: la fecha tiene que salir de
+     una o dos palabras contiguas del OCR, no armarse juntando dígitos que
+     el motor leyó en puntas opuestas de la imagen. Y esas palabras tienen
+     que tener confianza razonable — si el motor mismo duda de los
+     caracteres, no hay razón para confiar en la fecha que forman. */
+  const CONF_MINIMA_CARACTERES = 0.45;
+
   function extraerFechaConConfianza(texto, palabras = []) {
+    // 1) Portón de forma: sin algo con pinta de fecha, no se sigue.
+    if (!tieneFormaDeFecha(texto)) return { fecha: null, confianza: 0, motivo: 'sin_forma' };
+
     const fecha = extraerFecha(texto);
-    if (!fecha) return { fecha: null, confianza: 0 };
+    if (!fecha) return { fecha: null, confianza: 0, motivo: 'sin_fecha' };
 
-    // Confianza = promedio de las palabras que contienen dígitos de la fecha
-    const conNumeros = palabras.filter((w) => /\d{2}/.test(w.text || ''));
-    let confianza = 0;
-    if (conNumeros.length) {
-      confianza = conNumeros.reduce((a, w) => a + (w.confidence || 0), 0) / conNumeros.length / 100;
+    // 2) Procedencia: se busca la palabra (o el par contiguo) que contiene
+    //    la forma de fecha. Si no existe, los dígitos venían dispersos.
+    const conf = (w) => (w.confidence || 0) / 100;
+    let fuente = null;
+
+    for (let i = 0; i < palabras.length; i++) {
+      const solo = String(palabras[i].text || '');
+      if (tieneFormaDeFecha(solo)) {
+        fuente = { texto: solo, confianza: conf(palabras[i]) };
+        break;
+      }
+      /* Ventana de hasta TRES palabras contiguas. Dos no alcanzan: en modo
+         "texto disperso" Tesseract parte la fecha con frecuencia —"23/",
+         "01/", "27"— y exigir que entre en dos rechazaba fechas legítimas.
+         Tres cubre esa partición sin abrir la puerta a juntar dígitos de
+         puntas opuestas de la imagen, que es lo que se quiere evitar. */
+      for (let n = 2; n <= 3 && i + n - 1 < palabras.length; n++) {
+        const ventana = palabras.slice(i, i + n);
+        const junto = ventana.map((p) => String(p.text || '')).join('');
+        if (tieneFormaDeFecha(junto)) {
+          fuente = {
+            texto: junto,
+            confianza: ventana.reduce((a, p) => a + conf(p), 0) / ventana.length
+          };
+          break;
+        }
+      }
+      if (fuente) break;
     }
-    // Si el OCR no entregó detalle por palabra, se usa una estimación prudente
-    if (!confianza) confianza = 0.5;
 
-    return { fecha, confianza, crudo: (conNumeros[0] && conNumeros[0].text) || '' };
+    // Sin detalle por palabra (algunos modos de Tesseract no lo entregan) se
+    // acepta con una estimación prudente; con detalle, se exige procedencia.
+    if (!palabras.length) return { fecha, confianza: 0.5, crudo: '' };
+    if (!fuente) return { fecha: null, confianza: 0, motivo: 'dispersa' };
+
+    if (fuente.confianza < CONF_MINIMA_CARACTERES) {
+      return { fecha: null, confianza: fuente.confianza, motivo: 'baja_certeza' };
+    }
+
+    return { fecha, confianza: fuente.confianza, crudo: fuente.texto };
   }
 
   /* ---- Corrección de confusiones típicas del OCR -----------------------
@@ -733,6 +803,16 @@ const AgenteCaptura = (() => {
          fecha real (el 30). */
       re = /(^|[\s:;,()])(\d{1,2})[\s\/\-.]{1,2}(\d{2}|\d{4})(?![\d\/\-.])/g;
       while ((m = re.exec(t))) {
+        /* No alcanza con mirar el carácter inmediatamente anterior. Cuando
+           el OCR parte la fecha —"23/ 01/ 27", que en modo texto disperso
+           es lo habitual— antes del "01" hay un ESPACIO, así que el patrón
+           matcheaba "01/ 27" como mes/año y generaba una candidata de fin
+           de enero que le ganaba a la fecha real por ser posterior.
+           Se mira hacia atrás lo suficiente para detectar la cola de una
+           fecha completa: dígito, separador y espacios. */
+        const previo = t.slice(0, m.index + m[1].length);
+        if (/\d\s*[\/\-.]\s*$/.test(previo)) continue;
+
         const mes = Number(m[2]);
         const anioCrudo = m[3];
         const anioNum = Number(anioCrudo);
@@ -1169,6 +1249,7 @@ const AgenteCaptura = (() => {
     extraerFecha, extraerNombre, validarYNormalizar, estimarVencimiento,
     VIDA_UTIL_DIAS, iniciarEscaneoContinuo, iniciarEscaneoFecha,
     estirarContraste, umbralOtsu, umbralLocalAdaptativo,
+    tieneFormaDeFecha, extraerFechaConConfianza,
     detenerEscaneo, estaEscaneando, preprocesar, liberarOCR,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };

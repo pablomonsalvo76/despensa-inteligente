@@ -134,7 +134,12 @@ const casos = [
 
   // --- Robustez / rendimiento ---
   ['espacios múltiples',        'vto     23/01/27',                       '2027-01-23'],
-  ['multilínea',                'CONSUMIR ANTES DE\n23/01/27\nLOTE A45',  '2027-01-23']
+  ['multilínea',                'CONSUMIR ANTES DE\n23/01/27\nLOTE A45',  '2027-01-23'],
+  // REGRESIÓN: el OCR parte la fecha con espacios y el patrón mes/año
+  // matcheaba la cola ("01/ 27") generando un fin de enero que le ganaba
+  // a la fecha real por ser posterior.
+  ['fecha partida por el OCR',  '23/ 01/ 27',                             '2027-01-23'],
+  ['partida con más espacio',   '23 / 01 / 27',                           '2027-01-23']
 ];
 
 // ---- Corrida ----

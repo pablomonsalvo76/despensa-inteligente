@@ -288,6 +288,88 @@ const video = { videoWidth: 320, videoHeight: 240 };
       cap.extraerFecha(basura) === null, `devolvió ${cap.extraerFecha(basura)}`);
   }
 
+  /* ==================================================================
+     REGRESIÓN: portón de FORMA — que no lea números al azar
+     ------------------------------------------------------------------
+     Apuntando la cámara a un mármol, el OCR leyó las motas de la piedra
+     como "8 - 774634" y el sistema se puso a buscarle una fecha adentro.
+     El orden estaba invertido: leía cualquier cosa y después probaba si
+     algún patrón matcheaba. Ahora primero se exige FORMA de fecha.
+     ================================================================ */
+  {
+    const forma = cap.tieneFormaDeFecha;
+
+    const debenCortar = [
+      ['8 - 774634', 'ruido de un mármol'],
+      ['LH6 118 V1 23:00', 'lote y hora de envasado'],
+      ['500 g 250 ml', 'pesos del envase'],
+      ['1234567890', 'una tira de dígitos'],
+      ['', 'texto vacío']
+    ];
+    debenCortar.forEach(([t, d]) => {
+      chequear(`el portón corta: ${d}`, !forma(t), `"${t}" pasó el portón`);
+    });
+
+    const debenPasar = [
+      ['23/01/27', 'dd/mm/aa'],
+      ['03/27', 'mm/aa'],
+      ['20 AGO 2027', 'mes en letras'],
+      ['DIC 2026', 'sólo mes y año'],
+      ['vto 30-07-2027', 'con guiones y palabra clave']
+    ];
+    debenPasar.forEach(([t, d]) => {
+      chequear(`el portón deja pasar: ${d}`, forma(t), `"${t}" fue rechazado`);
+    });
+  }
+
+  /* ==================================================================
+     REGRESIÓN: procedencia — la fecha no se arma con dígitos dispersos
+     ================================================================ */
+  {
+    const conf = cap.extraerFechaConConfianza;
+    const w = (t, c = 70) => ({ text: t, confidence: c });
+
+    let r = conf('23/01/27', [w('23/01/27', 72)]);
+    chequear('acepta una fecha contenida en una sola palabra',
+      r.fecha === '2027-01-23', JSON.stringify(r));
+
+    r = conf('23/01/ 27', [w('23/01/', 70), w('27', 68)]);
+    chequear('acepta una fecha partida en dos palabras contiguas',
+      r.fecha === '2027-01-23', JSON.stringify(r));
+
+    r = conf('23/ 01/ 27', [w('23/', 70), w('01/', 68), w('27', 66)]);
+    chequear('acepta una fecha partida en TRES palabras (psm 11 lo hace seguido)',
+      r.fecha === '2027-01-23', JSON.stringify(r));
+
+    r = conf('23 xx 01 yy 27', [w('23', 70), w('xx', 30), w('01', 70), w('yy', 30), w('27', 70)]);
+    chequear('RECHAZA dígitos dispersos por la imagen',
+      r.fecha === null, `aceptó ${r.fecha}`);
+
+    /* Caso que SÓLO atrapa la regla de procedencia: el texto completo tiene
+       una fecha válida —el extractor la encuentra— pero los caracteres que
+       la forman vienen de palabras separadas por ruido en el medio. Sin
+       esta regla se aceptaría una fecha armada con dígitos de puntas
+       distintas de la imagen. */
+    r = conf('03/ 774634 27', [w('03/', 70), w('774634', 40), w('27', 65)]);
+    chequear('RECHAZA una fecha armada salteando ruido',
+      r.fecha === null, `aceptó ${r.fecha} — se armó cruzando el lote del medio`);
+
+    r = conf('23/01/27', [w('23/01/27', 20)]);
+    chequear('RECHAZA cuando el motor duda de los caracteres',
+      r.fecha === null && r.motivo === 'baja_certeza', JSON.stringify(r));
+
+    r = conf('8 - 774634', [w('8', 40), w('-', 20), w('774634', 35)]);
+    chequear('RECHAZA el ruido del mármol de punta a punta',
+      r.fecha === null, `aceptó ${r.fecha}`);
+
+    // Sin detalle por palabra (algunos modos de Tesseract no lo dan) se
+    // acepta con estimación prudente: exigir procedencia ahí dejaría la
+    // función inutilizable.
+    r = conf('23/01/27', []);
+    chequear('sin detalle por palabra sigue funcionando',
+      r.fecha === '2027-01-23', JSON.stringify(r));
+  }
+
   const total = ok + fallos.length;
   console.log(`\nSuite de escaneo continuo — ${ok}/${total} OK\n`);
   if (fallos.length) {
