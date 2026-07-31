@@ -1108,6 +1108,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const info = await ajustarCamara(photoStream);
       $('p-capture').disabled = false;
 
+      // Igual que en el modo "Escáner": conviene tener el modelo de PP-OCR
+      // bajando mientras el usuario encuadra, no recién al capturar. Sin
+      // esto, este panel nunca precargaba el motor y procesarFoto caía
+      // directo a Tesseract, que no lee fechas troqueladas.
+      if (typeof MotorPPOCR !== 'undefined' && MotorPPOCR.soportado() && !MotorPPOCR.estaListo()) {
+        MotorPPOCR.preparar((msg) => { if (msg) set('p-ocr-status', 'textContent', msg); })
+          .catch((e) => console.warn('PP-OCR no disponible:', e.message));
+      }
+
       if (info) {
         const mp = ((info.ancho * info.alto) / 1e6).toFixed(1);
         set('p-ocr-status', 'textContent',
@@ -1144,6 +1153,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $('p-file').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // Esta vía no pasa por "Activar cámara", así que puede llegar a
+    // procesarImagenOCR sin que PP-OCR se haya precargado nunca.
+    if (typeof MotorPPOCR !== 'undefined' && MotorPPOCR.soportado() && !MotorPPOCR.estaListo()) {
+      MotorPPOCR.preparar((msg) => { if (msg) set('p-ocr-status', 'textContent', msg); })
+        .catch((e2) => console.warn('PP-OCR no disponible:', e2.message));
+    }
     const reader = new FileReader();
     reader.onload = () => procesarImagenOCR(reader.result);
     reader.readAsDataURL(file);

@@ -602,7 +602,14 @@ const AgenteCaptura = (() => {
      convierte un 2 en un 9.
      -------------------------------------------------------------------- */
   async function leerConPPOCR(fuente, roi) {
-    if (typeof MotorPPOCR === 'undefined' || !MotorPPOCR.estaListo()) return null;
+    if (typeof MotorPPOCR === 'undefined' || !MotorPPOCR.soportado()) return null;
+    // No alcanza con exigir que ya esté listo: si alguien disparó la carga
+    // (p.ej. al activar la cámara) pero la foto se saca antes de que termine
+    // de bajar el modelo, esperamos acá en vez de resignarnos a Tesseract,
+    // que en la práctica no lee fechas troqueladas.
+    if (!MotorPPOCR.estaListo()) {
+      try { await MotorPPOCR.preparar(); } catch (e) { return null; }
+    }
 
     // Sin binarizar: PP-OCR trabaja mejor sobre los grises normalizados que
     // sobre una imagen de dos tonos, al revés que Tesseract.
@@ -1410,12 +1417,20 @@ const AgenteCaptura = (() => {
     let intentosDesdeHallazgo = 0;
     let nombreEntregado = !buscarNombre;
 
-    // Se precarga el motor antes del primer intento para que el usuario vea
-    // "preparando" en vez de una pantalla congelada varios segundos.
-    try { await obtenerWorker(); } catch (e) {
-      escaneoActivo = false;
-      onFecha(null, 0, 'sin_motor');
-      return;
+    // Se precarga Tesseract antes del primer intento para que el usuario vea
+    // "preparando" en vez de una pantalla congelada varios segundos. Pero es
+    // sólo el RESPALDO: si falla (p.ej. el CDN de Tesseract no cargó) no
+    // corresponde abortar el escaneo entero cuando PP-OCR —el motor
+    // principal, que no depende de Tesseract— sigue disponible.
+    try {
+      await obtenerWorker();
+    } catch (e) {
+      const hayPPOCR = typeof MotorPPOCR !== 'undefined' && MotorPPOCR.soportado();
+      if (!hayPPOCR) {
+        escaneoActivo = false;
+        onFecha(null, 0, 'sin_motor');
+        return;
+      }
     }
 
     while (escaneoActivo && (Date.now() - arranque) < presupuestoMs) {
