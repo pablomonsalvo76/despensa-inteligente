@@ -17,7 +17,8 @@ const DB = (() => {
 
   // Stores que componen la memoria persistente (Sección 6).
   const STORES = ['products', 'history', 'preferences', 'consumptionPatterns', 'gtinCache',
-    'dismissedRecipes', 'profile', 'household', 'shoppingState', 'notificationState', 'systemLog'];
+    'dismissedRecipes', 'profile', 'household', 'shoppingState', 'notificationState', 'systemLog',
+    'stylePreferences', 'generadorConfig'];
 
   function _key(store) {
     return `${NS}::${store}`;
@@ -116,7 +117,9 @@ const DB = (() => {
       household: _read('household', []),
       shoppingState: _read('shoppingState', {}),
       notificationState: _read('notificationState', {}),
-      systemLog: _read('systemLog', [])
+      systemLog: _read('systemLog', []),
+      stylePreferences: _read('stylePreferences', null),
+      generadorConfig: _read('generadorConfig', {})
     }, null, 2),
 
     importAll: (json) => {
@@ -138,6 +141,8 @@ const DB = (() => {
       _write('shoppingState', data.shoppingState && typeof data.shoppingState === 'object' ? data.shoppingState : { comprados: [], ignorados: [] });
       _write('notificationState', data.notificationState && typeof data.notificationState === 'object' ? data.notificationState : {});
       _write('systemLog', Array.isArray(data.systemLog) ? data.systemLog : []);
+      if (data.stylePreferences && typeof data.stylePreferences === 'object') _write('stylePreferences', data.stylePreferences);
+      _write('generadorConfig', data.generadorConfig && typeof data.generadorConfig === 'object' ? data.generadorConfig : {});
       init(); // completa cualquier store faltante con sus valores por defecto
       return { productos: data.products.length, desenlaces: (data.history || []).length };
     }

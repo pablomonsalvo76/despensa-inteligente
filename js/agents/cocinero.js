@@ -145,29 +145,17 @@ const AgenteCocinero = (() => {
     return bonusPrioritario + urgencyScore * 2 + coverageRatio - penalizacion;
   }
 
-  // Planificación del ciclo: dado el análisis de riesgo (o todo el
-  // inventario si no hay riesgo), sugiere hasta N recetas.
-  function suggestRecipes(enriquecidos, { max } = {}) {
-    const prefs = DB.get('preferences', {});
-    const invMap = inventarioNormalizado(enriquecidos);
-    const maxSug = max || prefs.maxSuggestions || 3;
+  /* ---- Evaluación de candidatas (compartida) ---------------------------
+     Filtra la base de recetas contra restricciones/seguridad/hogar y les
+     asigna puntaje. La usan tanto `suggestRecipes` (el ranking general)
+     como `recetasParaVencer` (las combinaciones para varios productos por
+     vencer a la vez): es la MISMA regla de qué receta es viable y cuánto
+     vale, no dos criterios distintos para la misma pregunta.
+     -------------------------------------------------------------------- */
+  function evaluarCandidatas(invMap, prefs, perfilHogar, perfilEstilo, productoPrioritario) {
     const descartadas = recetasDescartadas();
 
-    // El Cocinero consulta al Agente de Hogar: no cocina "para el usuario"
-    // sino PARA LA MESA. Alergias y condiciones de cualquier comensal son
-    // filtro duro; gustos y condiciones que sólo limitan ajustan el puntaje.
-    const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;
-
-    // Producto más próximo a vencer entre los aptos para consumo: es el que
-    // define la prioridad de todo el ranking.
-    const disponiblesOrdenados = [...invMap.values()].sort((a, b) => a.daysRemaining - b.daysRemaining);
-    const productoPrioritario = disponiblesOrdenados[0] || null;
-
-    // Gusto aprendido (conducta + preferencia declarada). Si nunca cocinaste
-    // ni declaraste nada, queda vacío y el ranking se comporta como antes.
-    const perfilEstilo = DB.get('stylePreferences', null);
-
-    const candidatas = RECIPES
+    return RECIPES
       .filter((r) => !descartadas.has(r.id))
       .filter((r) => cumpleRestricciones(r, prefs))
       .filter((r) => tieneCriticosDisponibles(r, invMap))
@@ -207,10 +195,87 @@ const AgenteCocinero = (() => {
       // Filtro duro del hogar: si alguien de la casa no puede comerlo por
       // alergia o condición médica, la receta no se ofrece. La seguridad
       // prevalece sobre el aprovechamiento (Sección 7).
-      .filter((c) => c.hogar.apta)
+      .filter((c) => c.hogar.apta);
+  }
+
+  // Planificación del ciclo: dado el análisis de riesgo (o todo el
+  // inventario si no hay riesgo), sugiere hasta N recetas.
+  function suggestRecipes(enriquecidos, { max } = {}) {
+    const prefs = DB.get('preferences', {});
+    const invMap = inventarioNormalizado(enriquecidos);
+    const maxSug = max || prefs.maxSuggestions || 3;
+
+    // El Cocinero consulta al Agente de Hogar: no cocina "para el usuario"
+    // sino PARA LA MESA. Alergias y condiciones de cualquier comensal son
+    // filtro duro; gustos y condiciones que sólo limitan ajustan el puntaje.
+    const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;
+
+    // Producto más próximo a vencer entre los aptos para consumo: es el que
+    // define la prioridad de todo el ranking.
+    const disponiblesOrdenados = [...invMap.values()].sort((a, b) => a.daysRemaining - b.daysRemaining);
+    const productoPrioritario = disponiblesOrdenados[0] || null;
+
+    // Gusto aprendido (conducta + preferencia declarada). Si nunca cocinaste
+    // ni declaraste nada, queda vacío y el ranking se comporta como antes.
+    const perfilEstilo = DB.get('stylePreferences', null);
+
+    const candidatas = evaluarCandidatas(invMap, prefs, perfilHogar, perfilEstilo, productoPrioritario)
       .sort((a, b) => b.puntaje - a.puntaje);
 
     return conExploracion(candidatas, maxSug);
+  }
+
+  // Cuántos de los productos prioritarios rescata una receta.
+  function contarRescatados(receta, prioritarios) {
+    return prioritarios.filter((p) =>
+      receta.ingredients.some((ing) => normalizeName(ing) === normalizeName(p.name))
+    ).length;
+  }
+
+  /* ---- Combinaciones para varios productos por vencer a la vez ---------
+     Cuando hay más de un producto en rojo/amarillo al mismo tiempo, además
+     del ranking general (`suggestRecipes`) el usuario quiere dos preguntas
+     distintas: "¿hay UNA receta que use TODO esto junto?" y, para cada
+     producto por separado, "¿qué cocino con ESTE?" — porque puede no
+     querer o no poder cocinar todo junto, y la respuesta no es excluyente.
+
+     "Próximo a vencer" reusa el mismo semáforo de vencimientos.js (rojo o
+     amarillo): no se inventa un umbral de días propio de esta función.
+     -------------------------------------------------------------------- */
+  function recetasParaVencer(enriquecidos) {
+    const prefs = DB.get('preferences', {});
+    const invMap = inventarioNormalizado(enriquecidos);
+    const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;
+    const perfilEstilo = DB.get('stylePreferences', null);
+
+    const prioritarios = [...invMap.values()]
+      .filter((p) => p.urgencia === 'rojo' || p.urgencia === 'amarillo')
+      .sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+    if (!prioritarios.length) return { prioritarios: [], combo: null, individuales: [] };
+
+    const candidatas = evaluarCandidatas(invMap, prefs, perfilHogar, perfilEstilo, prioritarios[0]);
+
+    // COMBO: la que más productos prioritarios rescata. Empate → gana la de
+    // mayor puntaje normal. Si ninguna rescata ni uno, no hay combo — nunca
+    // se ofrece un "combo" que en realidad no toca ningún producto urgente.
+    const combo = candidatas
+      .map((c) => ({ ...c, rescatados: contarRescatados(c.receta, prioritarios) }))
+      .filter((c) => c.rescatados > 0)
+      .sort((a, b) => b.rescatados - a.rescatados || b.puntaje - a.puntaje)[0] || null;
+
+    // INDIVIDUALES: por cada producto prioritario, su mejor receta propia.
+    // Puede repetir la del combo a propósito: son dos preguntas distintas.
+    const individuales = prioritarios
+      .map((p) => {
+        const mejor = candidatas
+          .filter((c) => c.receta.ingredients.some((ing) => normalizeName(ing) === normalizeName(p.name)))
+          .sort((a, b) => b.puntaje - a.puntaje)[0];
+        return mejor ? { producto: p, ...mejor } : null;
+      })
+      .filter(Boolean);
+
+    return { prioritarios, combo, individuales };
   }
 
   /* ---- Reserva de exploración ------------------------------------------
@@ -294,7 +359,7 @@ const AgenteCocinero = (() => {
   }
 
   return {
-    suggestRecipes, descartarReceta, alternativasA,
+    suggestRecipes, recetasParaVencer, descartarReceta, alternativasA,
     restaurarDescartadas, listarDescartadas,
     afinidadEstilo, BONUS_PRIORITARIO, MAX_AFINIDAD,
     // Lo usa el Agente Generador: la exclusión de vencidos es la regla de
