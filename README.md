@@ -85,7 +85,7 @@ exportar/importar). La base de recetas curadas, en `js/recipes.js`.
 |---|---|
 | Inventario, semáforo, alertas, historial, log del ciclo | Real, con persistencia local |
 | Escaneo de código de barras | Real: cámara + `html5-qrcode`, resuelve el GTIN contra Open Food Facts (API pública, sin API key) |
-| OCR de fecha de vencimiento | Real: cámara + Tesseract.js en el navegador |
+| OCR de fecha de vencimiento | Real: cámara + PP-OCR (ONNX Runtime Web) en el navegador, con Tesseract.js como respaldo |
 | Recetas del recetario | Real: 27 recetas curadas con instrucciones paso a paso |
 | Generación de recetas nuevas | Real, con LLM local vía Ollama. Opcional: si está apagado, el recetario sigue funcionando |
 | Chatbot | Real, parser por reglas. No entiende lenguaje libre arbitrario |
@@ -130,10 +130,13 @@ las decisiones posteriores son malas.
 
 ## Verificación
 
-Cuatro suites, **112 pruebas**, sin dependencias externas:
+Siete suites, **211 pruebas**, sin dependencias externas:
 
 ```bash
-node tests/fechas.test.js         # 37 — parseo de fechas de envase y OCR
+node tests/fechas.test.js         # 55 — parseo de fechas de envase y OCR
+node tests/nombre.test.js         # 26 — extracción del nombre del producto
+node tests/preprocesado.test.js   # 19 — recorte, binarización y contraste de la imagen
+node tests/escaneo.test.js        # 36 — escaneo continuo (código + fecha + nombre)
 node tests/recomendacion.test.js  # 16 — ranking de recetas y aprendizaje
 node tests/estilo.test.js         # 19 — aprendizaje de gusto y exploración
 node tests/generacion.test.js     # 40 — veto determinístico sobre el LLM
@@ -174,7 +177,7 @@ instala, funciona offline y ningún dato del usuario sale del dispositivo.
 |---|---|
 | Frontend | HTML + CSS + JavaScript vanilla (PWA) |
 | Persistencia | `localStorage` con exportar/importar |
-| OCR | Tesseract.js (en el navegador) |
+| OCR | PP-OCR sobre ONNX Runtime Web (en el navegador), Tesseract.js como respaldo |
 | Códigos de barras | html5-qrcode + Open Food Facts |
 | IA generativa | Ollama local (opcional) |
 | Orquestación | Código propio, ciclo explícito |

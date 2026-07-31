@@ -17,7 +17,7 @@ flowchart LR
     E2["Cámara<br/>foto de la fecha"]
     E3["Carga manual<br/>y chat"]
 
-    IA1{{"Tesseract.js<br/>OCR en el navegador"}}
+    IA1{{"PP-OCR (ONNX Runtime Web)<br/>OCR en el navegador, Tesseract.js de respaldo"}}
     X1[/"Open Food Facts<br/>API pública sin clave"/]
 
     L1["<b>Captura</b><br/>normaliza y valida"]
@@ -29,7 +29,7 @@ flowchart LR
     IA2{{"LLM local vía Ollama<br/>genera recetas nuevas"}}
     VETO["VETO DETERMINÍSTICO<br/>alergias · vencidos<br/>sólo lo que hay en casa"]
 
-    DB[("MEMORIA PERSISTENTE<br/>js/db.js sobre localStorage<br/><br/>products · history · preferences<br/>stylePreferences · household<br/>gtinCache · systemLog")]
+    DB[("MEMORIA PERSISTENTE<br/>js/db.js sobre localStorage<br/><br/>products · history · preferences<br/>stylePreferences · generadorConfig · household<br/>gtinCache · systemLog")]
 
     OUT["SALIDA<br/>alertas · recetas<br/>lista de compras · KPIs"]
 
@@ -164,7 +164,7 @@ sequenceDiagram
     participant UI as Interfaz
     participant CAP as Captura
     participant OFACT as Open Food Facts
-    participant OCR as Tesseract.js
+    participant OCR as PP-OCR (respaldo Tesseract.js)
     participant INV as Inventario
     participant DB as Memoria local
     participant ORQ as Orquestador

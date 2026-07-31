@@ -1,7 +1,7 @@
 # Contexto de trabajo — Despensa Inteligente
 
 > Registro vivo de qué se revisó, qué se arregló y hacia dónde va el proyecto.
-> Última actualización: 2026-07-30.
+> Última actualización: 2026-07-31.
 
 ## 1. Qué es el proyecto
 
@@ -220,3 +220,48 @@ en [js/agents/cocinero.js](../js/agents/cocinero.js). Devuelve
    en vez de reimplementar el filtro/dedup.
 4. Evaluar si conviene una allowlist de campos en `AgenteHogar.editar`
    antes de pensar en multi-usuario.
+
+---
+
+## 6. Trabajo práctico (UTN FRBA) — entrega final
+
+Este proyecto es el TP de "Inteligencia Artificial Aplicada a
+Organizaciones". Hay un `PLAN_ENTREGA_FINAL.md` en la raíz (fecha límite
+17/08/2026) que mapea día a día contra la grilla de evaluación de la
+consigna. Estado relevado el 2026-07-30 contra esa grilla:
+
+- ✅ **App funcionando (30%)**: publicada en GitHub Pages, repo público con
+  historia de commits real (35 commits a esa fecha).
+- ✅ **Arquitectura (20%)**: `docs/DIAGRAMAS.md` tiene arquitectura general,
+  flujo de agentes y tres UML (secuencia, casos de uso, modelo de datos).
+- ✅ **Parte 2 — IA local (20%)**: `docs/PARTE_2_IA_LOCAL.md` completo y
+  fundamentado con las 4 preguntas. Falta sólo la captura de terminal de
+  Ollama (bonus opcional).
+- ❌ **UX/UI · Nielsen (20%)** y **Ciberseguridad (10%)**: sin escribir
+  todavía como documento (el plan tiene contenido borrador, programado
+  para 11/08 y 12/08 respectivamente).
+- ❌ Secciones 1 y 7 de la consigna (presentación del equipo, IAs usadas en
+  el co-work + reflexión) y `docs/capturas/` (evidencia, mín. 3 capturas +
+  log de sesión real): no encontré ningún archivo que las cubra todavía.
+
+**Hecho el 2026-07-31**: `README.md` y `docs/DIAGRAMAS.md` estaban
+desactualizados (describían Tesseract.js como motor de OCR principal y
+"112 pruebas" en 4 suites) — corregido para reflejar PP-OCR + Tesseract de
+respaldo y las 211 pruebas reales en 7 suites.
+
+### Discusión abierta — límite de las 27 recetas fijas
+
+`js/recipes.js` tiene 27 recetas escritas a mano (con pasos completos),
+que en conjunto usan sólo 35 ingredientes distintos. `recetasParaVencer`
+(sección 4) busca únicamente ahí, así que con productos fuera de esos 35
+nombres no encuentra combo ni individuales. `docs/PARTE_2_IA_LOCAL.md` ya
+señala esto: *"un recetario fijo no es un agente cocinero, es una tabla de
+consulta"* — y por eso existe `AgenteGenerador` (LLM local), pero hoy no
+está conectado al camino de `recetasParaVencer`.
+
+**Para retomar mañana, 3 opciones sobre la mesa (no excluyentes):**
+1. Conectar `recetasParaVencer` con `AgenteGenerador` como respaldo cuando
+   el catálogo fijo no tiene combo/individual para un producto.
+2. Ampliar el catálogo fijo con más recetas escritas a mano (no depende de
+   que el usuario tenga Ollama corriendo).
+3. Ambas.
