@@ -2288,7 +2288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gemini: {
           firebaseConfig,
           recaptchaSiteKey: $('gen-gemini-recaptcha').value.trim() || null,
-          modelo: $('gen-gemini-modelo').value.trim() || 'gemini-2.0-flash'
+          modelo: $('gen-gemini-modelo').value.trim() || 'gemini-3.6-flash'
         }
       });
       toast('Configuración guardada.');

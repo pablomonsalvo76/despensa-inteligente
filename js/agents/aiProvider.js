@@ -38,7 +38,7 @@ const AIProvider = (() => {
   let config = {
     motor: 'ninguno',
     ollama: { url: 'http://localhost:11434', modelo: 'llama3.2' },
-    gemini: { modelo: 'gemini-2.0-flash', firebaseConfig: null, recaptchaSiteKey: null }
+    gemini: { modelo: 'gemini-3.6-flash', firebaseConfig: null, recaptchaSiteKey: null }
   };
 
   function mezclar(base, nueva) {
@@ -109,7 +109,7 @@ const AIProvider = (() => {
       });
     }
     const ai = puente.getAI(app, { backend: new puente.GoogleAIBackend() });
-    modeloGemini = puente.getGenerativeModel(ai, { model: modelo || 'gemini-2.0-flash' });
+    modeloGemini = puente.getGenerativeModel(ai, { model: modelo || 'gemini-3.6-flash' });
     return modeloGemini;
   }
 
