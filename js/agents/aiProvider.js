@@ -146,7 +146,12 @@ const AIProvider = (() => {
       try {
         await puente.getAppCheckToken(appCheck);
       } catch (e) {
-        console.warn('reCAPTCHA/App Check no pudo confirmar el token; se intenta igual:', e.message || e);
+        // Diagnóstico: se loguea el objeto completo, no sólo el mensaje —
+        // Firebase suele guardar el detalle útil en .code o .customData,
+        // que un simple .message no muestra.
+        console.error('App Check/reCAPTCHA falló al pedir el token:', e);
+        console.error('  code:', e && e.code);
+        console.error('  customData:', e && e.customData);
       }
     }
     const ai = puente.getAI(app, { backend: new puente.GoogleAIBackend() });
@@ -156,8 +161,15 @@ const AIProvider = (() => {
 
   async function invocarGemini(prompt, partes = []) {
     const modelo = await prepararGemini();
-    const resultado = await modelo.generateContent([prompt, ...partes]);
-    return resultado.response.text();
+    try {
+      const resultado = await modelo.generateContent([prompt, ...partes]);
+      return resultado.response.text();
+    } catch (e) {
+      console.error('generateContent falló:', e);
+      console.error('  code:', e && e.code);
+      console.error('  customData:', e && e.customData);
+      throw e;
+    }
   }
 
   // Motor de prueba: permite testear toda la cadena sin modelo ni red, con
