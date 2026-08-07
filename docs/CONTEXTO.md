@@ -325,14 +325,45 @@ local ya existente**, no reemplazada.
 - Suite completa: **226/226 pruebas en verde** (211 previas + 15 nuevas)
   tras el refactor.
 
-### Lo que falta para que esto funcione de punta a punta
+### Verificado de punta a punta — 2026-08-06
 
-**Depende del usuario, no es código pendiente**: crear el proyecto en
-Firebase Console (cuenta Google + plan Blaze), activar Firebase AI Logic
-y App Check (reCAPTCHA v3), y pegar esa configuración en Preferencias. Sin
-eso, la app sigue funcionando entera con el recetario y el OCR locales —
-nada se rompe por no tenerlo, sólo no aparecen los botones de IA en la
-nube.
+Se completó la configuración real (proyecto Firebase con cuenta personal,
+sin plan Blaze necesario para "Gemini Developer API", App Check con
+reCAPTCHA v3) y **`AgenteGenerador.generar()` con motor Gemini funcionó**:
+generó recetas nuevas usando sólo ingredientes reales de la despensa,
+marcadas "inventada", pasando por `validar()`. Confirma la cadena completa
+Firebase → Gemini → veto determinístico → UI.
+
+**Dos bugs reales encontrados y corregidos en el camino** (material
+concreto para la Sección 7 del TP — co-work con IA, qué salió mal):
+
+1. **El puente de módulo ES en `index.html` apuntaba a una URL de
+   `gstatic.com` con versión (`11.6.0`) donde `firebase-ai.js` no existía
+   — 404 real**, no un error de configuración del usuario. Se probó
+   primero cambiar a jsDelivr (`/+esm`), que sí resolvía el archivo pero
+   rompía en runtime con `"Service ai is not available"`: cada endpoint
+   `/+esm` empaqueta su propia copia interna de `@firebase/app`, así que
+   `initializeApp()` y `getAI()` terminaban mirando dos registros internos
+   distintos. La solución fue volver a `gstatic.com` (que sí comparte una
+   sola instancia entre los tres módulos, por diseño) con una versión
+   **verificada a mano** (`12.17.1`), no adivinada.
+2. **El modelo por defecto (`gemini-2.0-flash`) estaba dado de baja** del
+   lado de Google al momento de probarlo. Cambiado a `gemini-3.6-flash` en
+   `aiProvider.js`, `main.js` e `index.html`. Lección para el informe: un
+   nombre de modelo hardcodeado en el código puede quedar obsoleto sin que
+   nada en el proyecto avise — vale la pena mencionarlo como limitación
+   conocida (mantenimiento de un motor de IA en la nube).
+
+Ninguno de los dos bugs estaba en la lógica de la app (agentes, veto,
+tests) — los 226 tests siguieron en verde todo este tiempo. Estaban en la
+integración con un servicio externo, que es exactamente el tipo de cosa
+que no se puede testear sin red real.
+
+**Pendiente de probar todavía**: el botón "Leer con IA" (visión, para
+fecha/nombre difíciles en el panel de foto) y "Generar con IA" desde la
+sección "Para lo que se vence ahora" en Recetas — la generación general ya
+confirmó que la cadena funciona, pero conviene probar esos dos caminos
+específicos también antes de darlos por completamente verificados.
 
 ### Impacto en la rúbrica del TP (actualiza sección 6)
 
