@@ -794,17 +794,23 @@
      ellos mismos. No hace ninguna llamada por su cuenta: si el usuario
      nunca configura Gemini, este bloque carga y no hace nada más.
 
-     Se usa jsDelivr con `/+esm` (no gstatic.com con versión fija): ese
-     endpoint resuelve solo el archivo real dentro del paquete `firebase`
-     para cada subruta (`firebase/app`, `firebase/ai`, etc.) y siempre
-     apunta a la última versión. Con gstatic hay que acertarle al nombre
-     exacto de archivo Y a la versión a mano — un 404 real de esto mismo
-     (`firebase-ai.js` no existía en la versión que se probó primero) es
-     lo que llevó a cambiarlo. -->
+     TIENE QUE SER gstatic.com, no jsDelivr/esm.sh. Se probó jsDelivr
+     (`/+esm`) primero y falló en runtime con "Service ai is not
+     available": cada endpoint `+esm` empaqueta su PROPIA copia interna
+     de `@firebase/app` en vez de importarla de una URL compartida, así
+     que `initializeApp()` (del bundle de "app") y `getAI()` (del bundle
+     de "ai") terminan mirando dos registros internos distintos — para
+     Firebase, la app "no tiene" el servicio de IA registrado. En
+     gstatic.com, en cambio, `firebase-ai.js` importa `firebase-app.js`
+     por la MISMA URL versionada que este bloque, así que el navegador
+     reusa el mismo módulo cacheado y comparten un solo registro. Por
+     eso la versión tiene que coincidir exacto en las tres líneas de
+     abajo — no hay alias "latest" en gstatic, así que al actualizar el
+     SDK hay que cambiar el número a mano en las tres a la vez. -->
 <script type="module">
-  import { initializeApp } from 'https://cdn.jsdelivr.net/npm/firebase/app/+esm';
-  import { initializeAppCheck, ReCaptchaV3Provider } from 'https://cdn.jsdelivr.net/npm/firebase/app-check/+esm';
-  import { getAI, getGenerativeModel, GoogleAIBackend } from 'https://cdn.jsdelivr.net/npm/firebase/ai/+esm';
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
+  import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app-check.js';
+  import { getAI, getGenerativeModel, GoogleAIBackend } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-ai.js';
   window.__firebaseAI = {
     initializeApp, initializeAppCheck, ReCaptchaV3Provider,
     getAI, getGenerativeModel, GoogleAIBackend
