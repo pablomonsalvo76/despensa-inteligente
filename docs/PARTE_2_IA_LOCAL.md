@@ -264,6 +264,18 @@ lógica de riesgo aplicada con más información:
   protección real y recomendada es restringir la clave por dominio en
   Google Cloud Console (APIs y servicios → Credenciales), para que sólo
   funcione desde los orígenes de la app.
+
+  **Actualización honesta (2026-08-07):** en la implementación real,
+  reCAPTCHA v3 resultó tener un bug intermitente y sin resolver del
+  propio SDK de Firebase (confirmado con DevTools: la verificación de
+  Google devolvía 400 de forma reproducible, en escritorio y celular por
+  igual — issue #9135 de `firebase-js-sdk`). Se reemplazó por un token de
+  depuración fijo de App Check, que **sí es una credencial estática**
+  embarcada en el código — exactamente el riesgo que el párrafo anterior
+  decía que se evitaba. Es una degradación consciente, aceptada por el
+  plazo de entrega, documentada en detalle en `docs/CONTEXTO.md`. La
+  restricción de dominio de la clave de API sigue siendo la protección
+  real de respaldo mientras tanto.
 - **Sigue sin haber backend propio.** Firebase AI Logic no es un servidor
   que el equipo opere: es infraestructura de Google haciendo de
   intermediario. La arquitectura "sin backend" de la Sección 3 del informe

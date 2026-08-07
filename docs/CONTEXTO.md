@@ -359,11 +359,66 @@ tests) — los 226 tests siguieron en verde todo este tiempo. Estaban en la
 integración con un servicio externo, que es exactamente el tipo de cosa
 que no se puede testear sin red real.
 
-**Pendiente de probar todavía**: el botón "Leer con IA" (visión, para
-fecha/nombre difíciles en el panel de foto) y "Generar con IA" desde la
-sección "Para lo que se vence ahora" en Recetas — la generación general ya
-confirmó que la cadena funciona, pero conviene probar esos dos caminos
-específicos también antes de darlos por completamente verificados.
+### Bug 3 (grave) y solución final — 2026-08-07
+
+Al probar en dispositivos reales (celular, luego confirmado también desde
+Chrome de escritorio) apareció un tercer problema, más serio que los dos
+anteriores: **reCAPTCHA v3 fallaba de forma intermitente**, con dos
+síntomas distintos según el momento (`appCheck/recaptcha-error` cuando
+reCAPTCHA no lograba generar ningún token; `[401] Firebase App Check token
+is invalid` cuando sí generaba uno pero el servidor lo rechazaba). Rompía
+**tanto** la generación de recetas como el respaldo de visión por igual,
+sin importar si App Check estaba en modo "Supervisada" o "Aplicada".
+
+**Camino recorrido hasta la causa real:**
+1. Primera hipótesis (equivocada): re-inicialización de Firebase en cada
+   uso. Descartada — `modeloGemini` ya cachea el resultado, y el error
+   real nunca fue "Firebase App named '[DEFAULT]' already exists" (el que
+   correspondería a ese bug).
+2. Segunda hipótesis (parcialmente cierta): condición de carrera —
+   `initializeAppCheck()` no espera a que reCAPTCHA termine su primer
+   desafío antes de que salga la primera llamada real. Se corrigió
+   esperando el token explícitamente (`getAppCheckToken`) — necesario
+   pero no suficiente.
+3. **Regresión propia**: la primera versión de ese fix **cortaba con una
+   excepción si la espera del token fallaba**, lo cual bloqueaba TODO sin
+   importar el modo de App Check — antes, en "Supervisada", un token
+   fallido simplemente no bloqueaba nada; después, sí. Se corrigió para
+   que un fallo de reCAPTCHA sólo loguee un `console.warn`/`console.error`
+   y la llamada real se intente igual.
+4. **Evidencia decisiva**, con DevTools reales (Network + Console, tanto
+   en el celular como en Chrome de escritorio): la llamada de verificación
+   de Google (`POST google.com/recaptcha/api2/clr?k=...`) devolvía **400
+   Bad Request de forma reproducible**, con dominio y clave confirmados
+   correctos. Coincide con un issue abierto y sin resolver en el propio
+   `firebase-js-sdk` (**#9135**: fallos de reCAPTCHA v3 con App Check,
+   reportado en navegadores/modos variados). No es un bug de este
+   proyecto — es de Google/Firebase.
+
+**Solución aplicada**: reemplazar reCAPTCHA v3 por un **token de
+depuración fijo** de App Check (generado y registrado a mano en Firebase
+Console, guardado en `aiProvider.js` junto con el resto del default de
+fábrica, también en base64). `self.FIREBASE_APPCHECK_DEBUG_TOKEN` se
+setea antes de `initializeAppCheck`, así Firebase omite reCAPTCHA por
+completo. **Confirmado funcionando** — la generación de recetas con
+Gemini volvió a andar de punta a punta.
+
+**Trade-off, para dejarlo explícito**: un token de depuración es
+literalmente "confiá en cualquiera que tenga este valor" — mucho más
+débil que una atestación real. reCAPTCHA queda en el código
+(`initializeAppCheck` lo sigue recibiendo como provider) pero **inactivo
+en la práctica**: el token de depuración lo pisa. La protección real que
+sigue en pie es la restricción de dominio de la clave de API en Google
+Cloud Console (configurada en una sesión anterior). Material honesto y
+concreto para la Sección 6 (Ciberseguridad) del TP: riesgo identificado
+(bypass de App Check si alguien extrae el token del código público),
+medida de mitigación parcial (restricción de dominio como respaldo),
+decisión consciente de aceptar el trade-off por el plazo de entrega, con
+plan de revisar reCAPTCHA/otro proveedor de atestación más adelante.
+
+**Pendiente de confirmar**: "Leer con IA" (respaldo de visión) con esta
+misma solución — debería funcionar igual al usar el mismo `AIProvider`,
+pero conviene probarlo explícitamente antes de darlo por cerrado.
 
 ### Decisión: config de Gemini "de fábrica", no por usuario — 2026-08-06
 
