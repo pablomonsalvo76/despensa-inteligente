@@ -292,11 +292,15 @@ document.addEventListener('DOMContentLoaded', () => {
       : '¡Hola! 👋';
 
     const enriquecidos = AgenteVencimientos.analyze();
-    const riesgo = AgenteVencimientos.enRiesgo(enriquecidos);
+    // "Próximos a vencer" (rojo/amarillo) es un subconjunto de enRiesgo():
+    // enRiesgo() también trae los ya vencidos a propósito (lo necesita el
+    // orquestador), pero esta tarjeta promete "en los próximos N días" —
+    // un vencido no es "próximo", ya pasó. Mismo criterio que usa Alertas.
+    const proximos = enriquecidos.filter((p) => p.urgencia === 'rojo' || p.urgencia === 'amarillo');
     const prefs = DB.get('preferences', {});
     const umbral = (prefs.alertThresholds && prefs.alertThresholds.default && prefs.alertThresholds.default.yellow) || 3;
 
-    $('fc-vencer-n').textContent = `${riesgo.length} producto${riesgo.length === 1 ? '' : 's'}`;
+    $('fc-vencer-n').textContent = `${proximos.length} producto${proximos.length === 1 ? '' : 's'}`;
     $('fc-vencer-dias').textContent = umbral;
 
     const recetas = AgenteCocinero.suggestRecipes(enriquecidos);
@@ -346,8 +350,17 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `<div class="empty-state">El ciclo todavía no se ejecutó.</div>`
       : log.map((e) => `<div class="cm-row"><span class="cm-step">${escapeHtml(e.paso)}</span><span class="cm-txt">${escapeHtml(e.detalle)}</span></div>`).join('');
 
-    // Badge de la campana
-    const criticos = riesgo.filter((p) => p.urgencia === 'rojo' || p.urgencia === 'vencido').length;
+    actualizarBadgeAlertas(enriquecidos);
+  }
+
+  /* El badge de la campana vive en el header, visible en TODAS las
+     pantallas — a diferencia del resto de renderDashboard(), no alcanza
+     con recalcularlo sólo al entrar a Inicio. Se llama también apenas se
+     resuelve una alerta (Consumido/Descartado), para que el número baje
+     en el momento, no recién cuando se vuelve a Inicio. */
+  function actualizarBadgeAlertas(enriquecidos) {
+    const datos = enriquecidos || AgenteVencimientos.analyze();
+    const criticos = datos.filter((p) => p.urgencia === 'rojo' || p.urgencia === 'vencido').length;
     const badge = $('hdr-badge');
     badge.hidden = criticos === 0;
     badge.textContent = criticos;
@@ -1328,6 +1341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? '¡Rescatado! Suma a tu impacto.'
             : 'Registrado como descartado.');
           renderAlertas();
+          actualizarBadgeAlertas();
         });
       });
     }
@@ -1351,15 +1365,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderRecetas() {
     const enriquecidos = AgenteVencimientos.analyze();
-    const riesgo = AgenteVencimientos.enRiesgo(enriquecidos);
+    // "está(n) por vencer" no debe contar los ya vencidos — mismo criterio
+    // que la tarjeta de Inicio (ver renderDashboard).
+    const proximos = enriquecidos.filter((p) => p.urgencia === 'rojo' || p.urgencia === 'amarillo');
     recetasCache = AgenteCocinero.suggestRecipes(enriquecidos);
 
     const banner = $('recetas-banner');
-    if (riesgo.length === 0) banner.hidden = true;
+    if (proximos.length === 0) banner.hidden = true;
     else {
       banner.hidden = false;
       $('recetas-banner-text').textContent =
-        `⚠ ${riesgo.length} producto${riesgo.length === 1 ? '' : 's'} está${riesgo.length === 1 ? '' : 'n'} por vencer`;
+        `⚠ ${proximos.length} producto${proximos.length === 1 ? '' : 's'} está${proximos.length === 1 ? '' : 'n'} por vencer`;
     }
 
     renderRecetasParaVencer(enriquecidos);
@@ -2455,8 +2471,11 @@ document.addEventListener('DOMContentLoaded', () => {
   /* =========================================================================
      ARRANQUE
      ========================================================================= */
-  // Tras cada ciclo del orquestador se refresca la pantalla visible.
+  // Tras cada ciclo del orquestador se refresca la pantalla visible. El
+  // badge de la campana se actualiza siempre, sin importar la pantalla:
+  // vive en el header, visible en todas.
   Orquestador.onCycleComplete(() => {
+    actualizarBadgeAlertas();
     if (pantallaActual === 'sc-inicio') renderDashboard();
     if (pantallaActual === 'sc-productos') renderProductos();
     if (pantallaActual === 'sc-alertas') renderAlertas();
