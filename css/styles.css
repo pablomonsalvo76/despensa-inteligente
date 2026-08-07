@@ -328,7 +328,7 @@ button { font-family: inherit; }
    abajo está calculado en % para coincidir con el ROI real que se le
    manda al OCR (ver comentario ahí); recortar el video con `cover`
    desalinearía lo que el usuario ve de lo que la cámara realmente lee. */
-.scan-stage { position: relative; border-radius: 14px; overflow: hidden; background: #000; margin-bottom: 12px; max-height: 42vh; }
+.scan-stage { position: relative; border-radius: 14px; overflow: hidden; background: #000; margin-bottom: 12px; max-height: 28vh; }
 .scan-stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
 /* El inset coincide EXACTAMENTE con AgenteCaptura.ROI_ESCANER
    (x 8%, y 24%, ancho 84%, alto 52%): lo que el usuario ve encuadrado es
