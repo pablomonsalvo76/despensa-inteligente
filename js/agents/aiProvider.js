@@ -133,16 +133,20 @@ const AIProvider = (() => {
       });
 
       // initializeAppCheck() no espera a que reCAPTCHA termine su primer
-      // desafío — eso corre en segundo plano. Si el primer pedido a Gemini
-      // sale antes de que ese token esté listo, Firebase lo rechaza como
-      // "token is invalid" (no como "falta token"): parece un error de
-      // configuración, pero es una carrera contra el tiempo. Se pide el
-      // token acá y se espera de verdad antes de dejar pasar la primera
-      // llamada real; las siguientes ya lo tienen cacheado y son al toque.
+      // desafío — eso corre en segundo plano. Se pide el token acá para
+      // darle tiempo a estar listo ANTES de la primera llamada real (así
+      // no llega a Gemini una carrera contra el tiempo). Pero si reCAPTCHA
+      // en sí falla (bug conocido y sin resolver del propio SDK de
+      // Firebase en ciertos navegadores/modos — ver issue #9135), NO se
+      // corta acá: se sigue igual. Cortar acá convertía un problema que
+      // en modo "Supervisada" Firebase no bloquea en uno que bloqueaba
+      // SIEMPRE, en cualquier modo — un chequeo nuestro más estricto que
+      // el que hace Firebase, no algo que corresponda decidir en el
+      // cliente.
       try {
         await puente.getAppCheckToken(appCheck);
       } catch (e) {
-        throw new Error('No se pudo verificar la app con reCAPTCHA: ' + (e.message || e));
+        console.warn('reCAPTCHA/App Check no pudo confirmar el token; se intenta igual:', e.message || e);
       }
     }
     const ai = puente.getAI(app, { backend: new puente.GoogleAIBackend() });
