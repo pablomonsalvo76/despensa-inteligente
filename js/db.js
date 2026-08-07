@@ -18,7 +18,7 @@ const DB = (() => {
   // Stores que componen la memoria persistente (Sección 6).
   const STORES = ['products', 'history', 'preferences', 'consumptionPatterns', 'gtinCache',
     'dismissedRecipes', 'profile', 'household', 'shoppingState', 'notificationState', 'systemLog',
-    'stylePreferences', 'generadorConfig'];
+    'stylePreferences', 'aiProviderConfig'];
 
   function _key(store) {
     return `${NS}::${store}`;
@@ -119,7 +119,7 @@ const DB = (() => {
       notificationState: _read('notificationState', {}),
       systemLog: _read('systemLog', []),
       stylePreferences: _read('stylePreferences', null),
-      generadorConfig: _read('generadorConfig', {})
+      aiProviderConfig: _read('aiProviderConfig', {})
     }, null, 2),
 
     importAll: (json) => {
@@ -142,7 +142,7 @@ const DB = (() => {
       _write('notificationState', data.notificationState && typeof data.notificationState === 'object' ? data.notificationState : {});
       _write('systemLog', Array.isArray(data.systemLog) ? data.systemLog : []);
       if (data.stylePreferences && typeof data.stylePreferences === 'object') _write('stylePreferences', data.stylePreferences);
-      _write('generadorConfig', data.generadorConfig && typeof data.generadorConfig === 'object' ? data.generadorConfig : {});
+      _write('aiProviderConfig', data.aiProviderConfig && typeof data.aiProviderConfig === 'object' ? data.aiProviderConfig : {});
       init(); // completa cualquier store faltante con sus valores por defecto
       return { productos: data.products.length, desenlaces: (data.history || []).length };
     }

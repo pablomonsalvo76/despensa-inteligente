@@ -207,6 +207,61 @@ diseñada para funcionar completa sin ella.
 
 ---
 
+## 5 · Revisión: cuándo SÍ conviene la nube
+
+Lo anterior se escribió defendiendo lo local sin excepciones. En la
+implementación real aparecieron dos límites que el modelo local no podía
+resolver, y que llevaron a sumar Gemini (vía Firebase AI Logic) como
+**segundo motor**, no como reemplazo:
+
+1. **Ollama es inviable en el dispositivo real de uso.** La Sección 4 ya
+   documentaba esto ("fragmentación de la experiencia"), pero probarlo con
+   un usuario real lo confirmó de forma contundente: la generación de
+   recetas, atada a `localhost`, **nunca la iba a usar nadie desde el
+   celular** — sólo el equipo, probándola en una notebook. Eso no es una
+   función terminada, es una demo.
+2. **Un OCR clásico tiene techo con fechas troqueladas sin tinta**, incluso
+   con buena luz. No es un problema de configuración: PP-OCR y Tesseract
+   segmentan caracteres, y un relieve sin borde de tinta no tiene qué
+   segmentar. Se probó en un envase real, con linterna, y no hubo forma de
+   que el OCR local lo leyera.
+
+Frente a esto, la postura pasa de *"todo local, sin excepción"* a *"local
+por default; la nube se habilita agente por agente, con consentimiento
+explícito, sólo donde el costo de no hacerlo (una función que no funciona)
+supera al costo de privacidad (una foto puntual, no el historial
+completo)"*. No es una contradicción del argumento original — es la misma
+lógica de riesgo aplicada con más información:
+
+- **La generación de recetas** ahora puede usar Ollama (local, como antes)
+  o Gemini (nube, opcional) a través de un único módulo, `AIProvider`. El
+  prompt que se manda a la nube incluye el inventario y el estilo
+  aprendido — el mismo dato "sensible" que ya se discutía en la Sección 1.
+- **El respaldo de visión para fecha/nombre** (`AgenteCaptura.leerConVisionIA`)
+  sólo se ofrece detrás de un botón explícito, nunca dentro del bucle de
+  escaneo continuo. Lo que sale hacia Gemini es **una foto recortada de la
+  fecha**, sin nombre de producto, sin alergias, sin historial — un riesgo
+  de privacidad menor y distinto al de mandar el inventario completo, y el
+  informe puede decirlo con esa precisión en vez de tratar "mandar algo a
+  la nube" como un bloque homogéneo.
+- **La clave nunca es un secreto que haya que esconder.** Firebase AI Logic
+  autentica con App Check (atestación de que el pedido viene de la app
+  real), no con una clave estática — evita el riesgo de "clave de API
+  expuesta en el cliente" que sí existiría si se hubiera llamado a la API
+  de Gemini directo desde el navegador con una clave propia. Este es el
+  mismo riesgo documentado en la Sección 6 de la entrega (Ciberseguridad).
+- **Sigue sin haber backend propio.** Firebase AI Logic no es un servidor
+  que el equipo opere: es infraestructura de Google haciendo de
+  intermediario. La arquitectura "sin backend" de la Sección 3 del informe
+  no cambió por esto.
+
+En síntesis: el modelo local sigue siendo el default y el piso gratuito.
+La nube se sumó donde medir el sistema con un usuario real mostró que "es
+posible en teoría" no alcanzaba — la función tenía que andar en el
+dispositivo donde la persona realmente la usa.
+
+---
+
 ## Conclusión
 
 El modelo local no reemplazó nada en este proyecto: **habilitó** algo que

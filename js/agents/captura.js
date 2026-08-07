@@ -729,6 +729,104 @@ const AgenteCaptura = (() => {
     };
   }
 
+  /* ---- Respaldo: lectura con IA de visión (Gemini vía AIProvider) ------
+     Último recurso, NUNCA automático. El OCR local (PP-OCR/Tesseract)
+     falla en un caso real y medido: fechas troqueladas sin tinta, donde no
+     hay borde de tinta que segmentar. Un modelo de visión no segmenta
+     caracteres, interpreta la escena completa —incluida una sombra tenue
+     sobre un relieve— así que lee casos que el OCR clásico no puede, pero
+     tiene un costo real (llamada a un servicio externo) y le manda la foto
+     a un tercero: por eso esto se ofrece detrás de un botón explícito
+     (ver main.js), nunca dentro del bucle de escaneo continuo.
+
+     "El modelo propone, el código verifica" se sostiene igual acá: el
+     modelo no devuelve una fecha ya validada, devuelve texto transcripto,
+     y ese texto pasa por `extraerFecha()` — la MISMA función que ya
+     valida forma y plausibilidad para el OCR local. Un modelo que
+     "alucina" una fecha imposible no se salta ningún control por venir de
+     una vía distinta. */
+
+  // Umbral igual al de cuadroSinContenido: si la foto no tiene ni ese
+  // contraste mínimo, ningún modelo —local o de frontera— va a leer algo
+  // que la imagen no capturó. Evita gastar una llamada paga en una foto
+  // negra o totalmente desenfocada, y le dice al usuario qué corregir
+  // en vez de esperar una respuesta vacía del servicio.
+  function fotoIlegible(fuente) {
+    return cuadroSinContenido(fuente, ROI_COMPLETA);
+  }
+
+  // Convierte cualquier fuente dibujable a JPEG base64 (sin el prefijo
+  // data:), recortando el lado mayor para no mandar más resolución de la
+  // que un modelo de visión necesita ni de la que conviene pagar.
+  function aBase64JPEG(fuente, anchoMax = 1280) {
+    const w = fuente.videoWidth || fuente.naturalWidth || fuente.width;
+    const h = fuente.videoHeight || fuente.naturalHeight || fuente.height;
+    const esc = Math.min(1, anchoMax / Math.max(w, h));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(w * esc);
+    cv.height = Math.round(h * esc);
+    cv.getContext('2d').drawImage(fuente, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85).split(',')[1];
+  }
+
+  const PROMPT_VISION = [
+    'Mirá esta foto de un envase de alimento.',
+    'Transcribí TODO el texto que puedas leer o intuir: el nombre del',
+    'producto y cualquier fecha (vencimiento, elaboración, lote).',
+    'Muchas fechas de vencimiento están troqueladas en el plástico SIN',
+    'tinta, sólo relieve: interpretá sombras y contornos tenues, no sólo',
+    'texto impreso con contraste claro.',
+    'Respondé SOLO con JSON, sin texto alrededor:',
+    '{"textoVisible":"...","nombreProducto":"..."}',
+    'Si no distinguís nada legible, "textoVisible":"".'
+  ].join(' ');
+
+  /**
+   * Último recurso cuando el OCR local no encontró fecha o nombre.
+   * Devuelve la misma forma que `procesarFoto`, con `motor:'vision-ia'`,
+   * para que la UI no tenga que distinguir de dónde vino el resultado.
+   */
+  async function leerConVisionIA(fuente) {
+    const imagen = typeof fuente === 'string' ? await cargarImagen(fuente) : fuente;
+
+    if (fotoIlegible(imagen)) {
+      return {
+        estado: 'sin_texto', textoDetectado: '', fechaDetectada: null,
+        nombreDetectado: null, confianza: 0, motor: 'vision-ia',
+        motivo: 'foto_ilegible'
+      };
+    }
+
+    if (typeof AIProvider === 'undefined' || !AIProvider.soportaImagenes()) {
+      throw new Error('La IA de visión no está configurada (Preferencias → IA en la nube).');
+    }
+
+    const base64 = aBase64JPEG(imagen);
+    const respuesta = await AIProvider.generarConImagen(PROMPT_VISION, base64, 'image/jpeg');
+    const cruda = AIProvider.parsearJSON(respuesta) || {};
+
+    const texto = typeof cruda.textoVisible === 'string' ? cruda.textoVisible : '';
+    const fecha = texto ? extraerFecha(texto) : null;
+    const nombreTexto = typeof cruda.nombreProducto === 'string' ? cruda.nombreProducto.trim().slice(0, 60) : '';
+
+    if (!texto) {
+      return { estado: 'sin_texto', textoDetectado: '', fechaDetectada: null, nombreDetectado: null, confianza: 0, motor: 'vision-ia' };
+    }
+    return {
+      // Confianza fija y moderada-alta: el modelo no da un puntaje numérico
+      // propio, y no corresponde inventarle uno más preciso del que es.
+      estado: fecha ? 'ok' : 'sin_fecha',
+      textoDetectado: texto,
+      fechaDetectada: fecha,
+      nombreDetectado: nombreTexto ? { texto: nombreTexto, confianza: 0.8 } : null,
+      crudo: texto,
+      correccion: null,
+      confianza: fecha ? 0.8 : 0,
+      motor: 'vision-ia',
+      requiereConfirmacion: true
+    };
+  }
+
   const MESES_TXT = {
     ene: '01', jan: '01', feb: '02', mar: '03', abr: '04', apr: '04',
     may: '05', jun: '06', jul: '07', ago: '08', aug: '08',
@@ -1527,6 +1625,7 @@ const AgenteCaptura = (() => {
     estirarContraste, umbralOtsu, umbralLocalAdaptativo, cerrarPuntos,
     tieneFormaDeFecha, extraerFechaConConfianza, corregirPorPlausibilidad, tomarCorreccion,
     detenerEscaneo, estaEscaneando, preprocesar, liberarOCR, leerConPPOCR,
+    leerConVisionIA,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };
 })();

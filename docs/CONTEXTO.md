@@ -1,7 +1,7 @@
 # Contexto de trabajo — Despensa Inteligente
 
 > Registro vivo de qué se revisó, qué se arregló y hacia dónde va el proyecto.
-> Última actualización: 2026-07-31.
+> Última actualización: 2026-08-06.
 
 ## 1. Qué es el proyecto
 
@@ -208,18 +208,22 @@ en [js/agents/cocinero.js](../js/agents/cocinero.js). Devuelve
 
 ## 5. Próximos pasos sugeridos
 
-1. Diseñar el nuevo comportamiento de `AgenteCocinero`: función que separe
+1. ~~Diseñar el nuevo comportamiento de `AgenteCocinero`: función que separe
    "productos próximos a vencer" en (a) receta combinada que los use todos,
-   (b) recetas independientes por producto, reutilizando la regla de
-   inventario disponible de `cocinero.js` (y corrigiendo `compras.js` para
-   que use la misma, ver sección 3, punto 1).
+   (b) recetas independientes por producto~~ → **hecho** (`recetasParaVencer`,
+   sección 4, y enganchado a la UI + IA en sección 7).
 2. Implementar el desenlace `'ignorado'` en `evaluador.js` +
    `aprendizaje.js` + `impacto.js`, y una función que detecte "stock que se
    repite y no se consume" usando `addedDate` + historial de desenlaces.
+   **Sigue pendiente** — es la pieza que falta para "no consumís tanto, no
+   deberías tener tanto stock" (visión de producto, sección 4).
 3. Unificar `compras.js` para reutilizar `AgenteCocinero.inventarioDisponible`
-   en vez de reimplementar el filtro/dedup.
+   en vez de reimplementar el filtro/dedup. **Sigue pendiente.**
 4. Evaluar si conviene una allowlist de campos en `AgenteHogar.editar`
-   antes de pensar en multi-usuario.
+   antes de pensar en multi-usuario. **Sigue pendiente.**
+5. Migrar la memoria de `localStorage` a Firestore para que varios
+   dispositivos compartan una misma despensa (ver sección 7) — necesario
+   para el caso hotel/restaurante, no para la entrega del TP.
 
 ---
 
@@ -259,9 +263,84 @@ señala esto: *"un recetario fijo no es un agente cocinero, es una tabla de
 consulta"* — y por eso existe `AgenteGenerador` (LLM local), pero hoy no
 está conectado al camino de `recetasParaVencer`.
 
-**Para retomar mañana, 3 opciones sobre la mesa (no excluyentes):**
-1. Conectar `recetasParaVencer` con `AgenteGenerador` como respaldo cuando
-   el catálogo fijo no tiene combo/individual para un producto.
-2. Ampliar el catálogo fijo con más recetas escritas a mano (no depende de
-   que el usuario tenga Ollama corriendo).
-3. Ambas.
+**Decisión tomada (ver sección 7): opción 1 (conectar con IA generativa),
+implementada.** La opción 2 (más recetas a mano) sigue abierta como
+complemento, no se hizo.
+
+---
+
+## 7. IA unificada — implementado 2026-08-06
+
+Contexto de la decisión: se detectó en vivo que ni el escáner de fecha
+(troquelado sin tinta, falla incluso con linterna) ni el cocinero (27
+recetas fijas) cumplían su función real. Se evaluaron variantes (proxy
+propio en Cloudflare Workers, Firebase AI Logic, un documento externo de
+arquitectura multiagente en Python) — el análisis completo está en
+[`docs/PROPUESTA_IA_UNIFICADA.md`](PROPUESTA_IA_UNIFICADA.md). Decisión:
+**un solo proveedor de IA (`AIProvider`) compartido entre Captura y
+Cocinero, motor Gemini vía Firebase AI Logic** (sin backend propio: App
+Check autentica la app, no una clave expuesta) **+ Ollama como alternativa
+local ya existente**, no reemplazada.
+
+### Qué se construyó
+
+- **`js/agents/aiProvider.js`** (nuevo): interfaz única (`generarTexto`,
+  `generarConImagen`, `parsearJSON`, `disponible`, `soportaImagenes`,
+  `usarMotorFalso`). Motores: `ninguno` / `ollama` (texto) / `gemini`
+  (texto + imagen, vía el puente `<script type="module">` en `index.html`
+  que expone `window.__firebaseAI`).
+- **`generador.js` refactorizado**: ya no gestiona su propia conexión al
+  modelo, delega todo en `AIProvider` (mismo comportamiento externo,
+  `configurar/leerConfig/disponible/usarMotorFalso/parsearJSON` quedaron
+  como fachada fina para no romper a quien ya los llamaba).
+- **`generador.js` → `generarParaVencer(enriquecidos, prioritarios)`**
+  (nuevo): prompt que exige usar TODOS los productos obligatorios, y el
+  código vuelve a verificar la cobertura después de `validar()` — un
+  modelo que "se olvida" de un producto se descarta igual, aunque la
+  receta sea válida en todo lo demás.
+- **`captura.js` → `leerConVisionIA(fuente)`** (nuevo): respaldo de visión,
+  último recurso, nunca automático. Antes de gastar una llamada paga
+  chequea `cuadroSinContenido` (mismo umbral que ya usaba el OCR local) —
+  si la foto no tiene contraste, ni una IA va a leer lo que la imagen no
+  capturó, y se avisa sin llamar a nada. El texto que devuelve el modelo
+  pasa por `extraerFecha()`, la misma validación de forma/plausibilidad
+  que ya existía: el modelo no se salta ningún control por venir de una
+  vía distinta.
+- **`db.js`**: `generadorConfig` renombrado a `aiProviderConfig` (STORES,
+  exportAll, importAll) — es donde vive la config de motor ahora.
+- **UI (`index.html` + `main.js`)**:
+  - Preferencias → "IA generativa": selector de motor con campos según
+    corresponda (Ollama: url/modelo; Gemini: JSON de Firebase, clave de
+    reCAPTCHA de App Check, modelo).
+  - Recetas → nueva sección "Para lo que se vence ahora" (sólo con 2+
+    productos prioritarios): combo del catálogo fijo si existe, botón
+    "Generar con IA" si no, e igual por cada producto individual sin
+    receta propia.
+  - Panel "Foto fecha" → botón "Leer con IA" que aparece sólo si el OCR
+    local no llegó a `'ok'` y hay motor Gemini configurado.
+- **`tests/aiProvider.test.js`** (nuevo, 15 pruebas): config anidada,
+  motor falso, `foto_ilegible` sin gastar llamada, `extraerFecha()`
+  aplicada al texto del modelo, y el caso central — receta que no cubre
+  todos los obligatorios se rechaza aunque sea válida.
+- Suite completa: **226/226 pruebas en verde** (211 previas + 15 nuevas)
+  tras el refactor.
+
+### Lo que falta para que esto funcione de punta a punta
+
+**Depende del usuario, no es código pendiente**: crear el proyecto en
+Firebase Console (cuenta Google + plan Blaze), activar Firebase AI Logic
+y App Check (reCAPTCHA v3), y pegar esa configuración en Preferencias. Sin
+eso, la app sigue funcionando entera con el recetario y el OCR locales —
+nada se rompe por no tenerlo, sólo no aparecen los botones de IA en la
+nube.
+
+### Impacto en la rúbrica del TP (actualiza sección 6)
+
+- `PARTE_2_IA_LOCAL.md` ganó una sección 5 ("Revisión: cuándo SÍ conviene
+  la nube") que concilia el argumento pro-privacidad original con esta
+  decisión — no lo contradice, lo refina.
+- `docs/DIAGRAMAS.md` (arquitectura general) actualizado: nuevo nodo de
+  respaldo de visión, `IA2` renombrado a `AIProvider`, veto ahora incluye
+  "cobertura completa".
+- README actualizado: stack, "qué es real y qué no", limitaciones, conteo
+  de tests (226 en 8 suites).

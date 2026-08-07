@@ -200,6 +200,10 @@
           <input type="file" id="p-file" accept="image/*" capture="environment" />
           <p class="hint-text" id="p-ocr-status"></p>
           <div class="ocr-raw" id="p-ocr-raw" hidden></div>
+          <div id="p-ocr-ia-cont" hidden>
+            <button class="btn btn-outline btn-block" id="p-ocr-ia">Leer con IA (envía esta foto a un servicio externo)</button>
+            <p class="hint-text" id="p-ocr-ia-estado"></p>
+          </div>
           <p class="hint-text" style="text-align:left">
             Para la <strong>fecha</strong>: que ocupe casi toda la foto, enfocada y con luz pareja.
             Para el <strong>nombre</strong>: sacá el frente del envase completo.
@@ -287,6 +291,7 @@
         <div class="suggest-banner suggest-banner--danger" id="recetas-banner" hidden>
           <span id="recetas-banner-text"></span>
         </div>
+        <div id="recetas-paravencer" hidden></div>
         <div class="row-head"><h3>Con lo que tenés</h3></div>
         <div id="recetas-destacada"></div>
         <div class="row-head"><h3>Otras ideas</h3></div>
@@ -638,25 +643,47 @@
         <div class="section-title">Lo que el agente aprendió de tu gusto</div>
         <div class="card" id="pref-estilo-aprendido"></div>
 
-        <div class="section-title">Generación de recetas con IA</div>
+        <div class="section-title">IA generativa (recetas y lectura de fecha difícil)</div>
         <div class="card">
           <div class="form-row">
             <label>Motor</label>
             <select id="gen-motor">
-              <option value="ninguno">Desactivado — sólo el recetario local</option>
-              <option value="ollama">Ollama (modelo local en tu compu)</option>
+              <option value="ninguno">Desactivado — sólo el recetario y el OCR locales</option>
+              <option value="ollama">Ollama (modelo local en tu compu, sólo texto)</option>
+              <option value="gemini">Gemini en la nube (texto + lectura de fotos)</option>
             </select>
           </div>
-          <div class="form-row">
-            <label>Dirección de Ollama</label>
-            <input type="text" id="gen-url" placeholder="http://localhost:11434" />
+
+          <div id="gen-campos-ollama">
+            <div class="form-row">
+              <label>Dirección de Ollama</label>
+              <input type="text" id="gen-url" placeholder="http://localhost:11434" />
+            </div>
+            <div class="form-row">
+              <label>Modelo</label>
+              <input type="text" id="gen-modelo" placeholder="llama3.2" />
+            </div>
+            <p class="hint-text" style="text-align:left">El modelo corre en tu computadora: ningún dato de tu despensa sale del dispositivo. No lee fotos, sólo genera recetas — y sólo funciona con la app abierta desde <code>localhost</code>.</p>
           </div>
-          <div class="form-row">
-            <label>Modelo</label>
-            <input type="text" id="gen-modelo" placeholder="llama3.2" />
+
+          <div id="gen-campos-gemini" hidden>
+            <div class="form-row">
+              <label>Configuración de Firebase (JSON del proyecto)</label>
+              <textarea id="gen-gemini-config" rows="4" placeholder='{"apiKey":"...","projectId":"...","appId":"..."}'></textarea>
+            </div>
+            <div class="form-row">
+              <label>Clave del sitio de reCAPTCHA v3 (App Check)</label>
+              <input type="text" id="gen-gemini-recaptcha" placeholder="6Lc..." />
+            </div>
+            <div class="form-row">
+              <label>Modelo</label>
+              <input type="text" id="gen-gemini-modelo" placeholder="gemini-2.0-flash" />
+            </div>
+            <p class="hint-text" style="text-align:left">Estos datos no son secretos: identifican tu proyecto de Firebase, no dan acceso por sí solos. La app se autentica con App Check, no con una clave que haya que esconder. Con Gemini activo, la app puede además ofrecer "Leer con IA" cuando una foto no se lee con el motor local — esa foto puntual sale hacia Google, sólo si vos tocás ese botón.</p>
           </div>
+
           <button class="btn btn-primary btn-block" id="gen-guardar">Guardar</button>
-          <p class="hint-text" style="text-align:left">El modelo corre en tu computadora: ningún dato de tu despensa sale del dispositivo. Si está desactivado, la app funciona igual con el recetario local.</p>
+          <p class="hint-text" style="text-align:left">Si está desactivado, la app funciona igual con el recetario y el OCR locales.</p>
         </div>
 
         <div class="section-title">Umbrales de aviso</div>
@@ -759,12 +786,30 @@
      expone `ort` global: no requiere build step, igual que el resto. -->
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.js"></script>
 
+<!-- Puente a Firebase AI Logic (Gemini). El SDK de Firebase sólo se
+     distribuye como módulo ES, a diferencia del resto de las librerías de
+     esta página: este bloque es el único lugar del proyecto con `import`,
+     y sólo deja funciones en `window.__firebaseAI` para que el resto de
+     los scripts clásicos (aiProvider.js) las use sin volverse un módulo
+     ellos mismos. No hace ninguna llamada por su cuenta: si el usuario
+     nunca configura Gemini, este bloque carga y no hace nada más. -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
+  import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app-check.js';
+  import { getAI, getGenerativeModel, GoogleAIBackend } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-ai.js';
+  window.__firebaseAI = {
+    initializeApp, initializeAppCheck, ReCaptchaV3Provider,
+    getAI, getGenerativeModel, GoogleAIBackend
+  };
+</script>
+
 <!-- Memoria persistente y conocimiento -->
 <script src="js/db.js"></script>
 <script src="js/recipes.js"></script>
 <script src="js/illustrations.js"></script>
 
 <!-- Agentes (Sección 4 del diseño conceptual) -->
+<script src="js/agents/aiProvider.js"></script>
 <script src="js/agents/inventario.js"></script>
 <script src="js/agents/vencimientos.js"></script>
 <script src="js/agents/cocinero.js"></script>

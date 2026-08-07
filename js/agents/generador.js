@@ -54,22 +54,16 @@ const AgenteGenerador = (() => {
     vegano: ['carne', 'lacteo', 'huevo', 'animal']
   };
 
-  let config = { motor: 'ninguno', url: 'http://localhost:11434', modelo: 'llama3.2' };
-
-  function configurar(nueva) {
-    config = { ...config, ...(nueva || {}) };
-    DB.set('generadorConfig', config);
-    return config;
-  }
-
-  function leerConfig() {
-    config = { ...config, ...(DB.get('generadorConfig', {}) || {}) };
-    return config;
-  }
-
-  function disponible() {
-    return leerConfig().motor !== 'ninguno';
-  }
+  /* La configuración del motor (Ollama/Gemini/ninguno) vive en un solo
+     lugar: AIProvider. Este agente ya no gestiona su propia conexión al
+     modelo — sólo arma el prompt, pide texto y valida lo que vuelve. Estos
+     tres nombres se mantienen como fachada fina para no romper a quien ya
+     los llama (main.js), pero delegan enteros. */
+  function configurar(nueva) { return AIProvider.configurar(nueva); }
+  function leerConfig() { return AIProvider.leerConfig(); }
+  function disponible() { return AIProvider.disponible(); }
+  function usarMotorFalso(fn) { return AIProvider.usarMotorFalso(fn); }
+  function parsearJSON(texto) { return AIProvider.parsearJSON(texto); }
 
   /* =====================================================================
      VALIDACIÓN — función pura, sin red. Es el corazón de la seguridad.
@@ -173,7 +167,13 @@ const AgenteGenerador = (() => {
     return String(texto).replace(/[\r\n\t]+/g, ' ').replace(/[^\p{L}\p{N} .,%-]/gu, '').trim().slice(0, 40);
   }
 
-  function armarPrompt(disponibles, perfilEstilo, prefs) {
+  // `obligatorios`: nombres de producto que la receta DEBE usar, todos. Lo
+  // usa `generarParaVencer` para el caso "varios productos por vencer a la
+  // vez" (Agente Cocinero, `recetasParaVencer`): a diferencia del pedido
+  // general, acá no alcanza con "priorizar", el combo tiene que incluirlos
+  // sí o sí — y el código lo vuelve a chequear después (ver más abajo),
+  // porque pedirlo en el prompt no lo garantiza.
+  function armarPrompt(disponibles, perfilEstilo, prefs, obligatorios = []) {
     const lista = [...disponibles.values()]
       .sort((a, b) => a.daysRemaining - b.daysRemaining)
       .map((p) => `- ${sanitizar(p.name)} (vence en ${p.daysRemaining} día/s)`)
@@ -192,10 +192,14 @@ const AgenteGenerador = (() => {
       ...(prefs.dietary || []).map((d) => `la receta debe ser ${sanitizar(d)}`)
     ];
 
+    const nombresObligatorios = obligatorios.map(sanitizar).filter(Boolean);
+
     return [
       'Sos un cocinero que evita el desperdicio de alimentos.',
       'Creá UNA receta usando SOLAMENTE los ingredientes de esta lista.',
-      'Priorizá los que vencen antes.',
+      nombresObligatorios.length
+        ? `La receta TIENE que usar TODOS estos productos, sin excepción: ${nombresObligatorios.join(', ')}. Podés sumar otros de la lista si hace falta para que el plato tenga sentido.`
+        : 'Priorizá los que vencen antes.',
       '',
       'DESPENSA:', lista,
       '', `Podés asumir que hay: ${BASICOS.join(', ')}.`,
@@ -206,42 +210,6 @@ const AgenteGenerador = (() => {
       '{"name":"","ingredients":[],"critical":[],"steps":["",""],"cookTimeMin":25,"servings":2,"cocina":"","tipo":""}',
       'No inventes ingredientes que no estén en la lista.'
     ].filter(Boolean).join('\n');
-  }
-
-  /* =====================================================================
-     MOTORES
-     ===================================================================== */
-  async function invocarOllama(prompt) {
-    const { url, modelo } = leerConfig();
-    const resp = await fetch(`${url.replace(/\/$/, '')}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelo, prompt, stream: false, format: 'json' })
-    });
-    if (!resp.ok) throw new Error(`Ollama respondió ${resp.status}`);
-    const data = await resp.json();
-    return data.response;
-  }
-
-  // Motor de prueba: permite testear toda la cadena sin modelo ni red.
-  let motorFalso = null;
-  function usarMotorFalso(fn) { motorFalso = fn; }
-
-  async function invocar(prompt) {
-    if (motorFalso) return motorFalso(prompt);
-    const { motor } = leerConfig();
-    if (motor === 'ollama') return invocarOllama(prompt);
-    throw new Error(`Motor "${motor}" no disponible.`);
-  }
-
-  function parsearJSON(texto) {
-    if (typeof texto !== 'string') return null;
-    // Los modelos chicos suelen envolver el JSON en explicaciones o en ```json.
-    const limpio = texto.replace(/```(?:json)?/gi, '');
-    const desde = limpio.indexOf('{');
-    const hasta = limpio.lastIndexOf('}');
-    if (desde === -1 || hasta <= desde) return null;
-    try { return JSON.parse(limpio.slice(desde, hasta + 1)); } catch (e) { return null; }
   }
 
   /* =====================================================================
@@ -264,7 +232,7 @@ const AgenteGenerador = (() => {
     for (let i = 0; i < intentos; i++) {
       let cruda;
       try {
-        cruda = parsearJSON(await invocar(prompt));
+        cruda = AIProvider.parsearJSON(await AIProvider.generarTexto(prompt));
       } catch (e) {
         rechazadas.push({ motivo: e.message });
         break; // si el motor falla, reintentar no cambia nada
@@ -279,8 +247,58 @@ const AgenteGenerador = (() => {
     return { recetas, rechazadas };
   }
 
+  /* ---- Combo generado para "varios productos por vencer a la vez" ------
+     Respalda a `AgenteCocinero.recetasParaVencer`: cuando el catálogo fijo
+     de 27 recetas no tiene ninguna que use TODOS los productos prioritarios
+     (el caso normal — 27 recetas cubren 35 ingredientes, la despensa real
+     tiene muchos más), se le pide al modelo una receta a medida que sí los
+     use a todos.
+
+     No alcanza con pedirlo en el prompt: el código VUELVE A CHEQUEAR que
+     la receta devuelta contenga cada producto obligatorio, después de
+     pasar `validar()`. Si el modelo "se olvidó" de alguno, se descarta —
+     mismo principio que el resto del archivo, aplicado a un requisito
+     nuevo (cobertura completa) además de a la seguridad alimentaria. */
+  async function generarParaVencer(enriquecidos, prioritarios, { intentos = 2 } = {}) {
+    const prefs = DB.get('preferences', {});
+    const perfilEstilo = DB.get('stylePreferences', null);
+    const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;
+
+    const disponibles = AgenteCocinero.inventarioDisponible(enriquecidos);
+    if (!disponibles.size) return { receta: null, rechazadas: [], motivo: 'no hay ingredientes aptos' };
+
+    const nombresObligatorios = (prioritarios || []).map((p) => p.name);
+    const prompt = armarPrompt(disponibles, perfilEstilo, prefs, nombresObligatorios);
+    const rechazadas = [];
+
+    for (let i = 0; i < intentos; i++) {
+      let cruda;
+      try {
+        cruda = AIProvider.parsearJSON(await AIProvider.generarTexto(prompt));
+      } catch (e) {
+        rechazadas.push({ motivo: e.message });
+        break;
+      }
+      if (!cruda) { rechazadas.push({ motivo: 'el modelo no devolvió JSON válido' }); continue; }
+
+      const v = validar(cruda, { disponibles, prefs, perfilHogar });
+      if (!v.ok) { rechazadas.push({ motivo: v.motivo, nombre: cruda.name }); continue; }
+
+      const ingredientesReceta = new Set(v.receta.ingredients);
+      const faltantes = nombresObligatorios.filter((n) => !ingredientesReceta.has(normalizeName(n)));
+      if (faltantes.length) {
+        rechazadas.push({ motivo: `no cubrió: ${faltantes.join(', ')}`, nombre: v.receta.name });
+        continue;
+      }
+
+      return { receta: v.receta, rechazadas };
+    }
+
+    return { receta: null, rechazadas };
+  }
+
   return {
-    generar, validar, armarPrompt, parsearJSON, sanitizar,
+    generar, generarParaVencer, validar, armarPrompt, parsearJSON, sanitizar,
     configurar, leerConfig, disponible, usarMotorFalso,
     BASICOS, ORIGEN_ANIMAL, VETO_DIETA
   };

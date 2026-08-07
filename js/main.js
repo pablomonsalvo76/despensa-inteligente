@@ -1209,9 +1209,52 @@ document.addEventListener('DOMContentLoaded', () => {
       // Diagnóstico: ver el texto crudo es la única forma de entender por qué
       // una fecha no se leyó (suele ser que el OCR devolvió otra cosa).
       mostrarTextoCrudo(res.textoDetectado);
+
+      // El respaldo de visión sólo se ofrece cuando hace falta: si el OCR
+      // local ya encontró la fecha con confianza, gastar una llamada paga
+      // no aporta nada. Nunca se dispara solo.
+      mostrarBotonVisionIA(res.estado === 'ok' ? null : fuente);
     } catch (e) {
       status.textContent = 'No se pudo leer automáticamente: ' + (e.message || e) + ' Cargá los datos a mano.';
+      mostrarBotonVisionIA(fuente);
     }
+  }
+
+  function mostrarBotonVisionIA(fuente) {
+    const cont = find('p-ocr-ia-cont');
+    const btn = find('p-ocr-ia');
+    const estado = find('p-ocr-ia-estado');
+    if (!cont || !btn) return;
+
+    const iaLista = typeof AIProvider !== 'undefined' && AIProvider.disponible();
+    cont.hidden = !fuente || !iaLista;
+    if (estado) estado.textContent = '';
+    if (!fuente || !iaLista) return;
+
+    btn.disabled = false;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      if (estado) estado.textContent = 'Mandando la foto al modelo de visión…';
+      try {
+        const res = await AgenteCaptura.leerConVisionIA(fuente);
+        if (res.motivo === 'foto_ilegible') {
+          if (estado) estado.textContent = 'La foto está demasiado oscura o desenfocada — ni una IA puede leer lo que no está en la imagen. Sacá otra con más luz.';
+        } else if (res.fechaDetectada) {
+          set('f-expiry', 'value', res.fechaDetectada);
+          if (estado) estado.textContent = `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`;
+        } else {
+          if (estado) estado.textContent = 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
+        }
+        if (res.nombreDetectado) {
+          const campoNombre = find('f-name');
+          if (campoNombre && !campoNombre.value.trim()) campoNombre.value = res.nombreDetectado.texto;
+        }
+        mostrarTextoCrudo(res.textoDetectado);
+      } catch (e) {
+        if (estado) estado.textContent = 'No se pudo hablar con el modelo (' + (e.message || e) + ').';
+      }
+      btn.disabled = false;
+    };
   }
 
   function mostrarTextoCrudo(texto) {
@@ -1319,6 +1362,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `⚠ ${riesgo.length} producto${riesgo.length === 1 ? '' : 's'} está${riesgo.length === 1 ? '' : 'n'} por vencer`;
     }
 
+    renderRecetasParaVencer(enriquecidos);
+
     const destacadaCont = $('recetas-destacada');
     const otrasCont = $('recetas-otras');
 
@@ -1363,10 +1408,145 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /* ---- "Para lo que se vence ahora" (Agente Cocinero, recetasParaVencer)
+     -----------------------------------------------------------------------
+     Sólo aparece cuando hay VARIOS productos en rojo/amarillo a la vez —
+     con uno solo, ya lo cubre la sugerencia destacada de arriba. Muestra
+     el combo (si el catálogo fijo tiene una receta que los use a todos, o
+     a la mayor cantidad posible) y, para cada producto sin cobertura, la
+     opción de pedirle a la IA una receta a medida — nunca automático,
+     siempre un botón explícito, porque tiene costo y manda datos afuera. */
+  let paraVencerCache = { combo: null, individuales: [], prioritarios: [] };
+
+  function candidataDesdeGenerada(receta, prioritarios) {
+    return {
+      receta,
+      ingredientesUsados: receta.ingredients,
+      faltantes: [],
+      rescataPrioritario: prioritarios.length > 0,
+      productoPrioritario: prioritarios.length === 1 ? prioritarios[0] : null,
+      hogar: { advertencias: [] },
+      ingredientesUrgentes: prioritarios.map((p) => p.name)
+    };
+  }
+
+  function renderRecetasParaVencer(enriquecidos) {
+    const cont = find('recetas-paravencer');
+    if (!cont) return;
+
+    const r = AgenteCocinero.recetasParaVencer(enriquecidos);
+    paraVencerCache = r;
+
+    // Con 0 o 1 producto prioritario no hay nada que esta sección aporte
+    // por encima de la sugerencia destacada de siempre.
+    if (r.prioritarios.length < 2) { cont.hidden = true; cont.innerHTML = ''; return; }
+
+    cont.hidden = false;
+    const iaLista = typeof AIProvider !== 'undefined' && AIProvider.disponible();
+
+    const comboHTML = r.combo
+      ? `<div class="card">
+          <div class="priority-flag">Usa ${r.combo.rescatados} de ${r.prioritarios.length} productos por vencer</div>
+          <h4>${escapeHtml(r.combo.receta.name)}</h4>
+          <div class="rb-uses">${r.combo.ingredientesUsados.map(escapeHtml).join(', ')}</div>
+          <button class="btn btn-outline btn-block" id="pv-combo-ver">Ver receta</button>
+        </div>`
+      : `<div class="card">
+          <p class="hint-text" style="text-align:left">Ninguna receta del recetario usa juntos estos ${r.prioritarios.length} productos.</p>
+          ${iaLista
+            ? `<button class="btn btn-outline btn-block" id="pv-combo-ia">Generar con IA una que los use todos</button>
+               <p class="hint-text" id="pv-combo-ia-estado"></p>`
+            : `<p class="hint-text" style="text-align:left">Activá "IA en la nube" en Preferencias para pedirle al modelo una receta a medida.</p>`}
+        </div>`;
+
+    const individualesHTML = r.prioritarios.map((p) => {
+      const ind = r.individuales.find((x) => x.producto.name === p.name);
+      if (ind) {
+        return `<div class="recipe-mini" data-pv-individual="${escapeHtml(p.name)}">
+          <div class="prod-info"><h5>${escapeHtml(p.name)}</h5><p>${escapeHtml(ind.receta.name)}</p></div>
+        </div>`;
+      }
+      return `<div class="list-row">
+        <div class="lr-info"><div class="lr-title">${escapeHtml(p.name)}</div><div class="lr-sub">Sin receta en el recetario</div></div>
+        ${iaLista ? `<button class="btn-link" data-pv-individual-ia="${escapeHtml(p.name)}">Generar con IA</button>` : ''}
+      </div>`;
+    }).join('');
+
+    cont.innerHTML = `
+      <div class="row-head"><h3>Para lo que se vence ahora</h3></div>
+      ${comboHTML}
+      ${individualesHTML}
+      <p class="hint-text" id="pv-individual-ia-estado"></p>`;
+
+    const btnComboVer = find('pv-combo-ver');
+    if (btnComboVer) btnComboVer.addEventListener('click', () => abrirRecetaCandidata(paraVencerCache.combo));
+
+    document.querySelectorAll('[data-pv-individual]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const ind = paraVencerCache.individuales.find((x) => x.producto.name === el.dataset.pvIndividual);
+        if (ind) abrirRecetaCandidata(ind);
+      });
+    });
+
+    const btnComboIA = find('pv-combo-ia');
+    if (btnComboIA) {
+      btnComboIA.addEventListener('click', async () => {
+        const estado = find('pv-combo-ia-estado');
+        btnComboIA.disabled = true;
+        if (estado) estado.textContent = 'Pensando una receta que los use a todos…';
+        try {
+          const res = await AgenteGenerador.generarParaVencer(enriquecidos, paraVencerCache.prioritarios);
+          if (res.receta) {
+            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, paraVencerCache.prioritarios));
+          } else {
+            const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
+            if (estado) estado.textContent = `No se pudo generar una que los use a todos.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
+            btnComboIA.disabled = false;
+          }
+        } catch (e) {
+          if (estado) estado.textContent = `No se pudo hablar con el modelo (${escapeHtml(e.message || String(e))}).`;
+          btnComboIA.disabled = false;
+        }
+      });
+    }
+
+    document.querySelectorAll('[data-pv-individual-ia]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const nombre = btn.dataset.pvIndividualIa;
+        const producto = paraVencerCache.prioritarios.find((p) => p.name === nombre);
+        if (!producto) return;
+        const estado = find('pv-individual-ia-estado');
+        btn.disabled = true;
+        if (estado) estado.textContent = `Pensando una receta con ${nombre}…`;
+        try {
+          const res = await AgenteGenerador.generarParaVencer(enriquecidos, [producto]);
+          if (res.receta) {
+            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, [producto]));
+          } else {
+            const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
+            if (estado) estado.textContent = `No se pudo generar una receta con ${nombre}.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
+            btn.disabled = false;
+          }
+        } catch (e) {
+          if (estado) estado.textContent = `No se pudo hablar con el modelo (${escapeHtml(e.message || String(e))}).`;
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
   let recetaAbierta = null;
 
   function abrirReceta(indice) {
     const c = recetasCache[indice];
+    if (!c) return;
+    abrirRecetaCandidata(c);
+  }
+
+  // Extraído de abrirReceta: lo reutiliza también la sección "Para lo que
+  // se vence ahora" (combo/individuales de recetasParaVencer), que no vive
+  // en recetasCache por índice sino que arma sus propias candidatas.
+  function abrirRecetaCandidata(c) {
     if (!c) return;
     recetaAbierta = c;
 
@@ -2063,20 +2243,53 @@ document.addEventListener('DOMContentLoaded', () => {
      el recetario local sigue funcionando igual. Por eso todo acá está detrás
      de un botón explícito y nunca se llama solo durante el ciclo.
      -------------------------------------------------------------------- */
+  function alternarCamposMotor() {
+    const motor = find('gen-motor') ? $('gen-motor').value : 'ninguno';
+    set('gen-campos-ollama', 'hidden', motor !== 'ollama');
+    set('gen-campos-gemini', 'hidden', motor !== 'gemini');
+  }
+
   function renderGeneradorConfig() {
     const c = AgenteGenerador.leerConfig();
     if (find('gen-motor')) $('gen-motor').value = c.motor;
-    if (find('gen-url')) $('gen-url').value = c.url;
-    if (find('gen-modelo')) $('gen-modelo').value = c.modelo;
+    if (find('gen-url')) $('gen-url').value = c.ollama.url;
+    if (find('gen-modelo')) $('gen-modelo').value = c.ollama.modelo;
+    if (find('gen-gemini-config')) $('gen-gemini-config').value = c.gemini.firebaseConfig ? JSON.stringify(c.gemini.firebaseConfig) : '';
+    if (find('gen-gemini-recaptcha')) $('gen-gemini-recaptcha').value = c.gemini.recaptchaSiteKey || '';
+    if (find('gen-gemini-modelo')) $('gen-gemini-modelo').value = c.gemini.modelo;
+    alternarCamposMotor();
   }
+
+  on('gen-motor', 'change', alternarCamposMotor);
 
   const btnGenGuardar = find('gen-guardar');
   if (btnGenGuardar) {
     btnGenGuardar.addEventListener('click', () => {
+      const motor = $('gen-motor').value;
+
+      // El JSON de Firebase lo pega el usuario tal cual lo copia de la
+      // consola: si está mal formado, se avisa acá en vez de fallar recién
+      // cuando se intenta usar, que sería mucho más confuso.
+      let firebaseConfig = null;
+      const crudo = $('gen-gemini-config').value.trim();
+      if (crudo) {
+        try { firebaseConfig = JSON.parse(crudo); } catch (e) {
+          toast('La configuración de Firebase no es un JSON válido.');
+          return;
+        }
+      }
+
       AgenteGenerador.configurar({
-        motor: $('gen-motor').value,
-        url: $('gen-url').value.trim() || 'http://localhost:11434',
-        modelo: $('gen-modelo').value.trim() || 'llama3.2'
+        motor,
+        ollama: {
+          url: $('gen-url').value.trim() || 'http://localhost:11434',
+          modelo: $('gen-modelo').value.trim() || 'llama3.2'
+        },
+        gemini: {
+          firebaseConfig,
+          recaptchaSiteKey: $('gen-gemini-recaptcha').value.trim() || null,
+          modelo: $('gen-gemini-modelo').value.trim() || 'gemini-2.0-flash'
+        }
       });
       toast('Configuración guardada.');
     });

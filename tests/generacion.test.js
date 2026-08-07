@@ -38,13 +38,13 @@ function nuevoContexto() {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
 
-  ['js/db.js', 'js/recipes.js',
+  ['js/db.js', 'js/recipes.js', 'js/agents/aiProvider.js',
    'js/agents/inventario.js', 'js/agents/vencimientos.js', 'js/agents/cocinero.js',
    'js/agents/evaluador.js', 'js/agents/aprendizaje.js', 'js/agents/hogar.js',
    'js/agents/generador.js'
   ].forEach((f) => vm.runInContext(leer(f), sandbox, { filename: f }));
 
-  vm.runInContext(`globalThis.__api = { DB, AgenteGenerador, AgenteCocinero, AgenteHogar };`, sandbox);
+  vm.runInContext(`globalThis.__api = { DB, AgenteGenerador, AgenteCocinero, AgenteHogar, AIProvider };`, sandbox);
   return sandbox.__api;
 }
 

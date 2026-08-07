@@ -18,6 +18,7 @@ flowchart LR
     E3["Carga manual<br/>y chat"]
 
     IA1{{"PP-OCR (ONNX Runtime Web)<br/>OCR en el navegador, Tesseract.js de respaldo"}}
+    IAV{{"Respaldo de visión (Gemini)<br/>sólo si el usuario toca 'Leer con IA'"}}
     X1[/"Open Food Facts<br/>API pública sin clave"/]
 
     L1["<b>Captura</b><br/>normaliza y valida"]
@@ -26,15 +27,16 @@ flowchart LR
     L4["<b>Evaluador</b> · <b>Aprendizaje</b><br/>ajuste desde la conducta"]
     ORQ["<b>Orquestador</b><br/>corre el ciclo"]
 
-    IA2{{"LLM local vía Ollama<br/>genera recetas nuevas"}}
-    VETO["VETO DETERMINÍSTICO<br/>alergias · vencidos<br/>sólo lo que hay en casa"]
+    IA2{{"AIProvider<br/>Ollama local o Gemini en la nube, a elección<br/>genera recetas nuevas"}}
+    VETO["VETO DETERMINÍSTICO<br/>alergias · vencidos<br/>sólo lo que hay en casa · cobertura completa"]
 
-    DB[("MEMORIA PERSISTENTE<br/>js/db.js sobre localStorage<br/><br/>products · history · preferences<br/>stylePreferences · generadorConfig · household<br/>gtinCache · systemLog")]
+    DB[("MEMORIA PERSISTENTE<br/>js/db.js sobre localStorage<br/><br/>products · history · preferences<br/>stylePreferences · aiProviderConfig · household<br/>gtinCache · systemLog")]
 
     OUT["SALIDA<br/>alertas · recetas<br/>lista de compras · KPIs"]
 
     E1 --> L1
     E2 --> IA1 --> L1
+    IA1 -. si no lee la fecha .-> IAV -. botón explícito .-> L1
     E3 --> L1
     E1 -. GTIN .-> X1 -. nombre .-> L1
 
@@ -55,7 +57,7 @@ flowchart LR
     classDef ext fill:#5c6bc0,stroke:#3949ab,color:#fff
     classDef veto fill:#b71c1c,stroke:#7f0000,color:#fff
     classDef io fill:#455a64,stroke:#263238,color:#fff
-    class IA1,IA2 ia
+    class IA1,IA2,IAV ia
     class L1,L2,L3,L4,ORQ logica
     class VETO veto
     class DB mem
@@ -68,13 +70,21 @@ flowchart LR
 
 **Lo que hay que leer en este diagrama:**
 
-- Sólo **dos componentes son IA**: el OCR y el generador de recetas. Todo
-  el resto de la inteligencia del sistema es lógica determinística. Fue una
-  decisión, no una carencia: las reglas se pueden auditar y explicar, y en
-  una app que maneja alergias eso importa más que la sofisticación.
-- El LLM **nunca escribe directo a la salida**: pasa por el veto.
-- La memoria es local. No hay servidor, así que no hay datos de usuarios
-  en ningún lado fuera del dispositivo.
+- Sólo **tres componentes son IA**: el OCR local, su respaldo de visión en
+  la nube, y el generador de recetas — los tres pasan por `AIProvider`
+  (texto) o comparten el mismo patrón (visión). Todo el resto de la
+  inteligencia del sistema es lógica determinística. Fue una decisión, no
+  una carencia: las reglas se pueden auditar y explicar, y en una app que
+  maneja alergias eso importa más que la sofisticación.
+- El LLM **nunca escribe directo a la salida**: pasa por el veto, que ahora
+  también verifica cobertura completa (que una receta "combo" realmente
+  use todos los productos que dijo usar).
+- El respaldo de visión **nunca se dispara solo**: es un botón explícito
+  porque manda una foto puntual a un servicio externo (Gemini) y tiene
+  costo. Sin configurarlo, la app funciona entera con lo local.
+- La memoria sigue siendo local. Firebase AI Logic no es un servidor
+  propio: es infraestructura de Google haciendo de intermediario para no
+  exponer una clave en el cliente, no un backend que el equipo opere.
 
 ---
 

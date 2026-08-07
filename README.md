@@ -87,7 +87,9 @@ exportar/importar). La base de recetas curadas, en `js/recipes.js`.
 | Escaneo de código de barras | Real: cámara + `html5-qrcode`, resuelve el GTIN contra Open Food Facts (API pública, sin API key) |
 | OCR de fecha de vencimiento | Real: cámara + PP-OCR (ONNX Runtime Web) en el navegador, con Tesseract.js como respaldo |
 | Recetas del recetario | Real: 27 recetas curadas con instrucciones paso a paso |
-| Generación de recetas nuevas | Real, con LLM local vía Ollama. Opcional: si está apagado, el recetario sigue funcionando |
+| Recetas para "varios productos por vencer a la vez" | Real: `recetasParaVencer` busca en el recetario una receta que use la mayor cantidad posible de los productos prioritarios (combo) más una por cada producto suelto |
+| Generación de recetas nuevas | Real, con LLM vía `AIProvider` (Ollama local o Gemini en la nube, a elección). Opcional: si está apagado, el recetario sigue funcionando |
+| Respaldo de visión para fecha/nombre difíciles | Real, con Gemini vía Firebase AI Logic. Sólo detrás de un botón explícito ("Leer con IA"); nunca se dispara solo ni reemplaza al OCR local |
 | Chatbot | Real, parser por reglas. No entiende lenguaje libre arbitrario |
 | Aprendizaje de gustos y estilo | Real: aprende de lo que cocinás, lo que descartás y lo que declarás |
 | Notificaciones | Del navegador (`Notification` API). No son push de servidor |
@@ -130,7 +132,7 @@ las decisiones posteriores son malas.
 
 ## Verificación
 
-Siete suites, **211 pruebas**, sin dependencias externas:
+Ocho suites, **226 pruebas**, sin dependencias externas:
 
 ```bash
 node tests/fechas.test.js         # 55 — parseo de fechas de envase y OCR
@@ -140,6 +142,7 @@ node tests/escaneo.test.js        # 36 — escaneo continuo (código + fecha + n
 node tests/recomendacion.test.js  # 16 — ranking de recetas y aprendizaje
 node tests/estilo.test.js         # 19 — aprendizaje de gusto y exploración
 node tests/generacion.test.js     # 40 — veto determinístico sobre el LLM
+node tests/aiProvider.test.js     # 15 — proveedor de IA compartido, respaldo de visión y combo forzado
 ```
 
 Los tests se verificaron **por mutación**: se rompió cada control a
@@ -163,15 +166,26 @@ Todos los archivos JS pasan `node --check`.
   está, se carga el nombre a mano y queda memorizado.
 - El ahorro estimado usa un valor de referencia por producto: es una
   estimación declarada como tal, no un cálculo con precios reales.
-- La generación con LLM requiere Ollama corriendo localmente y la app
-  abierta desde `localhost` (restricción de *mixed content* del navegador).
+- Con el motor Ollama, la generación con LLM requiere Ollama corriendo
+  localmente y la app abierta desde `localhost` (restricción de *mixed
+  content* del navegador) — por eso es una función de escritorio, no de
+  celular. Con el motor Gemini (Firebase AI Logic) esta restricción no
+  aplica: funciona desde cualquier dispositivo con HTTPS e internet.
+- El respaldo de visión y el motor Gemini requieren que el usuario
+  configure un proyecto Firebase propio (Preferencias → IA en la nube).
+  Sin esa configuración, la app sigue funcionando entera con el recetario
+  y el OCR locales — nada se rompe por no tenerlo.
 
 ---
 
 ## Stack
 
-Sin framework, sin build step y sin backend — a propósito: la app se
-instala, funciona offline y ningún dato del usuario sale del dispositivo.
+Sin framework, sin build step y sin backend propio — a propósito: la app
+se instala, funciona offline y, salvo cuando el usuario activa la IA en la
+nube a conciencia, ningún dato sale del dispositivo. Firebase AI Logic no
+cambia esto: no es un servidor que nosotros operemos, es la infraestructura
+de Google haciendo de intermediario para no exponer una clave en el
+cliente — seguimos sin mantener backend propio.
 
 | Componente | Tecnología |
 |---|---|
@@ -179,7 +193,8 @@ instala, funciona offline y ningún dato del usuario sale del dispositivo.
 | Persistencia | `localStorage` con exportar/importar |
 | OCR | PP-OCR sobre ONNX Runtime Web (en el navegador), Tesseract.js como respaldo |
 | Códigos de barras | html5-qrcode + Open Food Facts |
-| IA generativa | Ollama local (opcional) |
+| IA generativa (texto) | `AIProvider`: Ollama local u opcionalmente Gemini en la nube, a elección |
+| IA de visión (fecha/nombre difíciles) | Gemini vía Firebase AI Logic, con App Check — sin clave expuesta en el cliente |
 | Orquestación | Código propio, ciclo explícito |
 | Despliegue | GitHub Pages |
 
@@ -190,3 +205,7 @@ instala, funciona offline y ningún dato del usuario sale del dispositivo.
 - [`PLAN_ENTREGA_FINAL.md`](PLAN_ENTREGA_FINAL.md) — plan de trabajo
 - [`INSTALAR_EN_CELULAR.md`](INSTALAR_EN_CELULAR.md) — instalación y APK
 - [`PLAN_MEJORAS.md`](PLAN_MEJORAS.md) — devoluciones e implementación
+- [`docs/CONTEXTO.md`](docs/CONTEXTO.md) — registro vivo de arquitectura, bugs y decisiones
+- [`docs/PROPUESTA_IA_UNIFICADA.md`](docs/PROPUESTA_IA_UNIFICADA.md) — por qué un solo `AIProvider` para Cocinero y Captura
+- [`docs/PARTE_2_IA_LOCAL.md`](docs/PARTE_2_IA_LOCAL.md) — Parte 2 del TP: rol del LLM/SLM local
+- [`docs/DIAGRAMAS.md`](docs/DIAGRAMAS.md) — arquitectura, flujo de agentes y UML
