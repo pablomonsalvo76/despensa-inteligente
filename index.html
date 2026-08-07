@@ -813,10 +813,10 @@
      SDK hay que cambiar el número a mano en las tres a la vez. -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-  import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app-check.js';
+  import { initializeAppCheck, ReCaptchaV3Provider, getToken as getAppCheckToken } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app-check.js';
   import { getAI, getGenerativeModel, GoogleAIBackend } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-ai.js';
   window.__firebaseAI = {
-    initializeApp, initializeAppCheck, ReCaptchaV3Provider,
+    initializeApp, initializeAppCheck, ReCaptchaV3Provider, getAppCheckToken,
     getAI, getGenerativeModel, GoogleAIBackend
   };
 </script>
