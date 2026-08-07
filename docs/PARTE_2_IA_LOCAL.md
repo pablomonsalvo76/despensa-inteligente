@@ -226,11 +226,17 @@ resolver, y que llevaron a sumar Gemini (vía Firebase AI Logic) como
    segmentar. Se probó en un envase real, con linterna, y no hubo forma de
    que el OCR local lo leyera.
 
-Frente a esto, la postura pasa de *"todo local, sin excepción"* a *"local
-por default; la nube se habilita agente por agente, con consentimiento
-explícito, sólo donde el costo de no hacerlo (una función que no funciona)
-supera al costo de privacidad (una foto puntual, no el historial
-completo)"*. No es una contradicción del argumento original — es la misma
+Frente a esto, la postura pasa de *"todo local, sin excepción"* a *"la nube
+es una capa disponible por default —con un proyecto Firebase provisto por
+la app, para que funcione sin fricción de instalación— pero el
+consentimiento real se pide en el momento de cada acción concreta: tocar
+'Crear una receta con IA' o 'Leer con IA' es la decisión del usuario de
+que ESE dato puntual salga, no una casilla marcada una vez al configurar
+la app"*. Se prefirió esto a exigirle a cada persona crear su propio
+proyecto Firebase antes de poder usar la función — inviable para el
+usuario final, y la razón por la que `AIProvider` sigue permitiendo
+apagar el motor o apuntar a un proyecto propio en Preferencias para quien
+lo prefiera. No es una contradicción del argumento original — es la misma
 lógica de riesgo aplicada con más información:
 
 - **La generación de recetas** ahora puede usar Ollama (local, como antes)
@@ -250,6 +256,14 @@ lógica de riesgo aplicada con más información:
   expuesta en el cliente" que sí existiría si se hubiera llamado a la API
   de Gemini directo desde el navegador con una clave propia. Este es el
   mismo riesgo documentado en la Sección 6 de la entrega (Ciberseguridad).
+  El JSON del proyecto va además codificado en base64 dentro de
+  `aiProvider.js` — no como protección real (se decodifica con una línea
+  en la consola del navegador, eso es inevitable en cualquier app 100%
+  cliente) sino para no dejarlo como texto plano fácilmente rastreable
+  por bots que escanean repos públicos buscando el prefijo `AIzaSy`. La
+  protección real y recomendada es restringir la clave por dominio en
+  Google Cloud Console (APIs y servicios → Credenciales), para que sólo
+  funcione desde los orígenes de la app.
 - **Sigue sin haber backend propio.** Firebase AI Logic no es un servidor
   que el equipo opere: es infraestructura de Google haciendo de
   intermediario. La arquitectura "sin backend" de la Sección 3 del informe

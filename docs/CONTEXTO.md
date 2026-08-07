@@ -365,6 +365,29 @@ sección "Para lo que se vence ahora" en Recetas — la generación general ya
 confirmó que la cadena funciona, pero conviene probar esos dos caminos
 específicos también antes de darlos por completamente verificados.
 
+### Decisión: config de Gemini "de fábrica", no por usuario — 2026-08-06
+
+Motivo: si cada persona que abre el link publicado (incluido el docente
+evaluando el TP, que abre el link *solo*, sin el alumno al lado — así lo
+dice la consigna) tiene que crear su propio proyecto Firebase antes de ver
+la IA funcionando, en la práctica nadie más que el alumno la va a ver
+andar. Se cambió `AIProvider` para traer un proyecto Firebase provisto por
+la app como default (`motor: 'gemini'` de entrada, con `firebaseConfig`
+embarcado en el código, codificado en base64 para no dejarlo como texto
+plano grepeable). Un usuario puede seguir apagándolo o pegando su propio
+proyecto en Preferencias — eso sigue pisando el default.
+
+Esto cambió la narrativa de "opt-in explícito por usuario" que tenía
+`PARTE_2_IA_LOCAL.md` — se actualizó esa sección para explicar que el
+consentimiento real pasó a estar en el momento de tocar cada botón
+("Crear receta con IA" / "Leer con IA"), no en si hay o no una config
+guardada. Documentado también en el `README.md` y en el propio texto de
+ayuda de Preferencias en `index.html`.
+
+Recomendación pendiente para el usuario (no es código): restringir la
+API key por dominio en Google Cloud Console → APIs y servicios →
+Credenciales, para que sólo funcione desde los orígenes reales de la app.
+
 ### Impacto en la rúbrica del TP (actualiza sección 6)
 
 - `PARTE_2_IA_LOCAL.md` ganó una sección 5 ("Revisión: cuándo SÍ conviene

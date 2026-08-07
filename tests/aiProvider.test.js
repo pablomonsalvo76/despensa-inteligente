@@ -62,7 +62,7 @@ function nuevoContexto() {
   const sandbox = {
     console, Date, Math, JSON, Set, Map, Promise, RegExp, Number, String,
     Array, Object, Error, isNaN, parseInt, parseFloat, setTimeout, clearTimeout,
-    Float64Array, Uint8Array, Uint8ClampedArray,
+    Float64Array, Uint8Array, Uint8ClampedArray, atob, btoa,
     localStorage: {
       getItem: (k) => (k in almacen ? almacen[k] : null),
       setItem: (k, v) => { almacen[k] = String(v); },
@@ -126,7 +126,17 @@ async function chequearAsync(desc, fn) {
     const { api } = nuevoContexto();
     const { AIProvider } = api;
 
-    chequear('sin configurar, no hay motor disponible', !AIProvider.disponible());
+    // Sin que el usuario configure nada, ya viene disponible con el
+    // proyecto Gemini de fábrica (decisión: la app funciona con IA "out
+    // of the box", no depende de que cada persona arme su propio proyecto
+    // Firebase). Debe poder desactivarse explícitamente igual.
+    chequear('sin configurar nada, ya hay motor disponible (config de fábrica)',
+      AIProvider.disponible());
+    chequear('la config de fábrica es gemini con firebaseConfig real',
+      AIProvider.leerConfig().motor === 'gemini' && !!AIProvider.leerConfig().gemini.firebaseConfig);
+
+    AIProvider.configurar({ motor: 'ninguno' });
+    chequear('el usuario puede desactivarlo igual', !AIProvider.disponible());
 
     AIProvider.configurar({ motor: 'ollama', ollama: { url: 'http://x:1', modelo: 'llama3.2' } });
     chequear('con motor ollama, disponible() es true', AIProvider.disponible());
@@ -170,7 +180,10 @@ async function chequearAsync(desc, fn) {
     const { api, estadoCanvas } = nuevoContexto();
     const { AIProvider, AgenteCaptura } = api;
 
-    // Sin motor configurado: rechaza con un mensaje claro, no una excepción rara.
+    // Motor desactivado a mano (el default de fábrica es 'gemini', así
+    // que hay que apagarlo explícito para probar este caso): rechaza con
+    // un mensaje claro, no una excepción rara.
+    AIProvider.configurar({ motor: 'ninguno' });
     await chequearAsync('sin Gemini configurado, leerConVisionIA rechaza con mensaje claro', async () => {
       try {
         await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);

@@ -88,8 +88,8 @@ exportar/importar). La base de recetas curadas, en `js/recipes.js`.
 | OCR de fecha de vencimiento | Real: cámara + PP-OCR (ONNX Runtime Web) en el navegador, con Tesseract.js como respaldo |
 | Recetas del recetario | Real: 27 recetas curadas con instrucciones paso a paso |
 | Recetas para "varios productos por vencer a la vez" | Real: `recetasParaVencer` busca en el recetario una receta que use la mayor cantidad posible de los productos prioritarios (combo) más una por cada producto suelto |
-| Generación de recetas nuevas | Real, con LLM vía `AIProvider` (Ollama local o Gemini en la nube, a elección). Opcional: si está apagado, el recetario sigue funcionando |
-| Respaldo de visión para fecha/nombre difíciles | Real, con Gemini vía Firebase AI Logic. Sólo detrás de un botón explícito ("Leer con IA"); nunca se dispara solo ni reemplaza al OCR local |
+| Generación de recetas nuevas | Real, con LLM vía `AIProvider`. Gemini viene activado de fábrica (proyecto propio de la app); se puede apagar o cambiar a Ollama/proyecto propio en Preferencias. Si está apagado, el recetario sigue funcionando |
+| Respaldo de visión para fecha/nombre difíciles | Real, con Gemini vía Firebase AI Logic (activado de fábrica). Sólo detrás de un botón explícito ("Leer con IA"); nunca se dispara solo ni reemplaza al OCR local |
 | Chatbot | Real, parser por reglas. No entiende lenguaje libre arbitrario |
 | Aprendizaje de gustos y estilo | Real: aprende de lo que cocinás, lo que descartás y lo que declarás |
 | Notificaciones | Del navegador (`Notification` API). No son push de servidor |
@@ -171,10 +171,12 @@ Todos los archivos JS pasan `node --check`.
   content* del navegador) — por eso es una función de escritorio, no de
   celular. Con el motor Gemini (Firebase AI Logic) esta restricción no
   aplica: funciona desde cualquier dispositivo con HTTPS e internet.
-- El respaldo de visión y el motor Gemini requieren que el usuario
-  configure un proyecto Firebase propio (Preferencias → IA en la nube).
-  Sin esa configuración, la app sigue funcionando entera con el recetario
-  y el OCR locales — nada se rompe por no tenerlo.
+- El motor Gemini viene **configurado de fábrica** (un proyecto Firebase
+  provisto por la app, no del usuario), para que la IA funcione sin que
+  cada persona tenga que crear el suyo — se puede desactivar o
+  reemplazar por un proyecto propio en Preferencias → IA en la nube. Con
+  el motor en "Desactivado", la app sigue funcionando entera con el
+  recetario y el OCR locales.
 
 ---
 

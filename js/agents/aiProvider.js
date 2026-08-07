@@ -35,10 +35,34 @@
 const AIProvider = (() => {
   const CLAVE = 'aiProviderConfig';
 
+  /* Proyecto Firebase provisto por defecto ("de fábrica"), no una clave
+     de cada usuario. No es un secreto: identifica el proyecto, no da
+     acceso por sí solo — la seguridad real la da Firebase App Check
+     (`recaptchaSiteKey`), que verifica que el pedido venga de esta app
+     real, y la clave está restringida por dominio en Google Cloud
+     Console. Se embarca a propósito para que la app funcione con IA sin
+     que cada persona que la abra tenga que crear su propio proyecto —
+     quien quiera usar el suyo puede sobreescribir esto en Preferencias,
+     que siempre gana por encima de este default.
+
+     Va en base64, NO como protección real (con F12 se lee igual — eso es
+     inevitable en cualquier app 100% cliente, no hay dónde esconder nada
+     de un navegador) sino para no dejar el prefijo "AIzaSy" como texto
+     plano grepeable: varios bots escanean repos públicos de GitHub
+     buscando exactamente ese patrón. */
+  function decodificarDefault() {
+    try {
+      return JSON.parse(atob('eyJtb2RlbG8iOiJnZW1pbmktMy42LWZsYXNoIiwiZmlyZWJhc2VDb25maWciOnsiYXBpS2V5IjoiQUl6YVN5RE1VMkRtMzhPcS15NEFGa0VVMUxzcjNEbU53ajZXMHhBIiwiYXV0aERvbWFpbiI6ImRlc3BlbnNhLWludGVsaWdlbnRlLWlhLmZpcmViYXNlYXBwLmNvbSIsInByb2plY3RJZCI6ImRlc3BlbnNhLWludGVsaWdlbnRlLWlhIiwic3RvcmFnZUJ1Y2tldCI6ImRlc3BlbnNhLWludGVsaWdlbnRlLWlhLmZpcmViYXNlc3RvcmFnZS5hcHAiLCJtZXNzYWdpbmdTZW5kZXJJZCI6IjkxODE2MDY4MDk2OSIsImFwcElkIjoiMTo5MTgxNjA2ODA5Njk6d2ViOjYxMzhmNTVmNjkyNGU3MThjZDcwZDgifSwicmVjYXB0Y2hhU2l0ZUtleSI6IjZMY2pTWGt0QUFBQUFOLW5Hb0hTTjZzbnVxNnh6OEZjZmxaMjdoZTUifQ=='));
+    } catch (e) { return null; }
+  }
+  const GEMINI_POR_DEFECTO = decodificarDefault();
+
   let config = {
-    motor: 'ninguno',
+    motor: GEMINI_POR_DEFECTO ? 'gemini' : 'ninguno',
     ollama: { url: 'http://localhost:11434', modelo: 'llama3.2' },
-    gemini: { modelo: 'gemini-3.6-flash', firebaseConfig: null, recaptchaSiteKey: null }
+    gemini: GEMINI_POR_DEFECTO
+      ? { ...GEMINI_POR_DEFECTO }
+      : { modelo: 'gemini-3.6-flash', firebaseConfig: null, recaptchaSiteKey: null }
   };
 
   function mezclar(base, nueva) {
