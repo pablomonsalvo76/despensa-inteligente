@@ -744,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pasoEstado('step-fecha', 'buscando', 'leyendo…');
     if (faltaNombre) pasoEstado('step-nombre', 'buscando', 'leyendo…');
     set('auto-status', 'textContent', 'Preparando el lector de texto…');
+    ocultarBotonVisionIAAuto();
 
     // Al pasar de código de barras a fecha cambia la distancia de trabajo: el
     // código se lee de lejos, la fecha casi pegada. Se fuerza un reenfoque en
@@ -801,14 +802,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (motivo === 'sin_motor') {
           pasoEstado('step-fecha', '', 'sin conexión');
           set('auto-status', 'textContent', 'No se pudo cargar el lector de texto (necesita conexión la primera vez). Cargá la fecha a mano abajo.');
+          mostrarBotonVisionIAAuto(video);
           return;
         }
         if (!iso) {
           pasoEstado('step-fecha', '', 'no se pudo leer');
           anunciar('Sin lectura', 'Cargá la fecha a mano abajo');
           set('auto-status', 'textContent', 'No encontré la fecha. Suele estar en la tapa o el borde; probá más cerca y con más luz, o usá "No la sé — estimar por categoría".');
+          mostrarBotonVisionIAAuto(video);
           return;
         }
+        ocultarBotonVisionIAAuto();
         set('f-expiry', 'value', iso);
         pasoEstado('step-fecha', 'listo', fmtFecha(iso));
         vibrar([60, 40, 60]);
@@ -848,6 +852,64 @@ document.addEventListener('DOMContentLoaded', () => {
     encuadreFecha(false);
     set('auto-start', 'hidden', false);
     set('auto-stop', 'hidden', true);
+    ocultarBotonVisionIAAuto(); // la cámara se cierra acá, el botón ya no tiene de dónde sacar un frame
+  }
+
+  // El lector sigue vivo tras un intento fallido (por diseño: se puede
+  // seguir buscando el código mientras tanto), así que la cámara del
+  // Escáner sigue disponible para sacarle un frame a la IA de visión sin
+  // reabrir nada.
+  function ocultarBotonVisionIAAuto() {
+    const cont = find('auto-ocr-ia-cont');
+    if (cont) cont.hidden = true;
+  }
+
+  function mostrarBotonVisionIAAuto(video) {
+    const cont = find('auto-ocr-ia-cont');
+    const btn = find('auto-ocr-ia');
+    const estado = find('auto-ocr-ia-estado');
+    if (!cont || !btn) return;
+
+    const iaLista = typeof AIProvider !== 'undefined' && AIProvider.disponible();
+    cont.hidden = !iaLista;
+    if (estado) estado.textContent = '';
+    if (!iaLista) return;
+
+    btn.disabled = false;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      if (estado) estado.textContent = 'Mandando la foto al modelo de visión…';
+      try {
+        const res = await AgenteCaptura.leerConVisionIA(video);
+        if (res.motivo === 'foto_ilegible') {
+          if (estado) estado.textContent = 'La cámara está muy oscura o desenfocada para que una IA la lea. Acercate más con buena luz.';
+        } else if (res.fechaDetectada) {
+          set('f-expiry', 'value', res.fechaDetectada);
+          pasoEstado('step-fecha', 'listo', fmtFecha(res.fechaDetectada));
+          set('auto-status', 'textContent', `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`);
+          vibrar([60, 40, 60]);
+        } else if (estado) {
+          estado.textContent = 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
+        }
+
+        if (res.nombreDetectado) {
+          const campoNombre = find('f-name');
+          if (campoNombre && !campoNombre.value.trim()) {
+            campoNombre.value = res.nombreDetectado.texto;
+            pasoEstado('step-nombre', 'listo', res.nombreDetectado.texto);
+          }
+        }
+
+        const crudo = find('auto-crudo');
+        if (crudo && res.textoDetectado) {
+          crudo.hidden = false;
+          crudo.textContent = `La IA lee: "${res.textoDetectado.replace(/\s+/g, ' ').trim().slice(0, 80)}"`;
+        }
+      } catch (e) {
+        if (estado) estado.textContent = 'No se pudo hablar con el modelo (' + (e.message || e) + ').';
+      }
+      btn.disabled = false;
+    };
   }
 
   /* Salida manual, disponible DESDE EL PRINCIPIO y no como premio consuelo.
