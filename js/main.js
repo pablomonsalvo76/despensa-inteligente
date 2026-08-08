@@ -445,8 +445,6 @@ document.addEventListener('DOMContentLoaded', () => {
       set('panel-photo', 'hidden', true);
       set('panel-auto', 'hidden', true);
       document.querySelectorAll('.capture-btn').forEach((b) => b.classList.remove('active'));
-      set('capture-grid', 'hidden', false);
-      set('capture-back', 'hidden', true);
       set('s-origen', 'textContent', '');
       set('p-ocr-status', 'textContent', '');
       set('auto-status', 'textContent', '');
@@ -486,9 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
     set('hdr-title', 'textContent', esEdicion ? 'Editar producto' : 'Agregar producto');
   }
 
-  // Elegido un método, la grilla de los tres botones ocupa espacio que no
-  // aporta nada mientras se está escaneando — se oculta y queda sólo la
-  // flecha para volver a elegir, que es lo que de verdad hace falta.
   document.querySelectorAll('.capture-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const metodo = btn.dataset.method;
@@ -503,19 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (metodo === 'auto') $('panel-auto').hidden = false;
       if (metodo === 'scan') $('panel-scan').hidden = false;
       if (metodo === 'photo') $('panel-photo').hidden = false;
-      set('capture-grid', 'hidden', true);
-      set('capture-back', 'hidden', false);
     });
-  });
-
-  on('capture-back', 'click', () => {
-    stopCameras();
-    document.querySelectorAll('.capture-btn').forEach((b) => b.classList.remove('active'));
-    $('panel-scan').hidden = true;
-    $('panel-photo').hidden = true;
-    $('panel-auto').hidden = true;
-    set('capture-grid', 'hidden', false);
-    set('capture-back', 'hidden', true);
   });
 
   $('f-estimar').addEventListener('click', () => {
