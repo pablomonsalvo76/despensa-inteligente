@@ -7,11 +7,11 @@
 
 ## Sección 1 · Presentación del equipo y del proyecto
 
-> **Pendiente de completar por el alumno**: nombre(s) de integrante(s) y
-> rol que tomó cada uno durante el desarrollo. No se completa acá con
-> datos inventados.
-
-- **Integrantes**: _(completar)_
+- **Integrantes**: Pablo Monsalvo — equipo de una sola persona. Al no
+  haber división de roles entre integrantes, el rol cubrió todo el ciclo:
+  diseño de la arquitectura de agentes, desarrollo del código, decisiones
+  de producto (qué priorizar, qué escalamiento evaluar), documentación y
+  co-work con las herramientas de IA descriptas en la Sección 7.
 - **Nombre del proyecto**: Despensa Inteligente
 - **Problema que resuelve**: en un hogar se tira comida por dos razones
   que no son falta de ganas — no se sabe qué hay, y no se sabe qué está

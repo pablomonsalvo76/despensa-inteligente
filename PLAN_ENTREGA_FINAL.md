@@ -16,7 +16,7 @@ sean. La grilla de evaluación es:
 | UX/UI (heurísticas + público objetivo) | 20% | Hecho — `docs/UX_NIELSEN.md`. Falta sólo la prueba con un usuario real (5.2) |
 | Parte 2 — IA local | 20% | Hecho — `docs/PARTE_2_IA_LOCAL.md`, con sección de revisión sobre la nube |
 | Ciberseguridad (4 riesgos) | 10% | Hecho — `docs/CIBERSEGURIDAD.md`, 7 riesgos con evidencia real |
-| Secciones 1 y 7 (equipo + IA en co-work) | — | `docs/EQUIPO_Y_COWORK.md`. Falta completar Sección 1 (integrantes) |
+| Secciones 1 y 7 (equipo + IA en co-work) | — | Hecho — `docs/EQUIPO_Y_COWORK.md` |
 
 **El pivot a restaurantes/hoteles no aparece en ningún criterio.** Se responde
 en el informe (Sección 8, semana 3), no reescribiendo la app.
