@@ -9,13 +9,14 @@ Hoy: martes 28/07/2026. **Quedan 20 días.**
 Las tareas están ordenadas por **peso en la nota**, no por lo interesante que
 sean. La grilla de evaluación es:
 
-| Criterio | Peso | Estado hoy |
+| Criterio | Peso | Estado al 2026-08-11 |
 |---|---|---|
-| App funcionando y demostrable | 30% | Existe, **falta publicarla** |
-| Arquitectura (diagrama + tabla stack) | 20% | Sin empezar |
-| UX/UI (heurísticas + público objetivo) | 20% | Sin empezar |
-| Parte 2 — IA local | 20% | Sin empezar |
-| Ciberseguridad (4 riesgos) | 10% | Sin empezar |
+| App funcionando y demostrable | 30% | Publicada y funcionando, incluida IA en la nube (Gemini) de fábrica. Falta la evidencia de la Sección 4 (ver `docs/capturas/`) |
+| Arquitectura (diagrama + tabla stack) | 20% | Hecho — `docs/DIAGRAMAS.md` |
+| UX/UI (heurísticas + público objetivo) | 20% | Hecho — `docs/UX_NIELSEN.md`. Falta sólo la prueba con un usuario real (5.2) |
+| Parte 2 — IA local | 20% | Hecho — `docs/PARTE_2_IA_LOCAL.md`, con sección de revisión sobre la nube |
+| Ciberseguridad (4 riesgos) | 10% | Hecho — `docs/CIBERSEGURIDAD.md`, 7 riesgos con evidencia real |
+| Secciones 1 y 7 (equipo + IA en co-work) | — | `docs/EQUIPO_Y_COWORK.md`. Falta completar Sección 1 (integrantes) |
 
 **El pivot a restaurantes/hoteles no aparece en ningún criterio.** Se responde
 en el informe (Sección 8, semana 3), no reescribiendo la app.

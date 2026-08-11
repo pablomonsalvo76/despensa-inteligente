@@ -453,3 +453,28 @@ Credenciales, para que sólo funcione desde los orígenes reales de la app.
   "cobertura completa".
 - README actualizado: stack, "qué es real y qué no", limitaciones, conteo
   de tests (226 en 8 suites).
+
+### Mejora de UI pendiente (anotada, no implementada) — 2026-08-11
+
+En el panel "Escáner", el botón "Leer con IA" (y "Escribir la fecha a
+mano") quedan varias pantallas de scroll por debajo de la cámara — el
+usuario que no scrollea nunca se entera de que existen. Se probó achicar
+la cámara con `max-height` + `object-fit: contain`, pero eso rompió el
+recuadro que dibuja `html5-qrcode` (mide el contenedor una sola vez, al
+arrancar, y queda desalineado si el tamaño cambia por CSS después) — se
+revirtió (commits `7ef02b6`, `64e49b1`, `ea8f542`).
+
+**Propuesta acordada, sin implementar todavía**: en vez de tocar el
+tamaño de la cámara, mover "Leer con IA" y "Escribir la fecha a mano" a
+una barra fija (`position: sticky`) pegada arriba de la barra de
+navegación inferior — visible sin scrollear, sin tocar la cámara ni el
+ROI del OCR en absoluto. Es el patrón estándar en apps de escaneo
+(acción secundaria/fallback siempre visible, nunca escondida). Maqueta de
+referencia armada como Artifact (comparación antes/después con los
+colores reales de `styles.css`) — pedir el link si se retoma, no quedó
+guardado en el repo por ser sólo una vista previa.
+
+Próximo paso si se retoma: implementar la barra fija en
+`css/styles.css` (`.sticky-actions`, con `position: sticky; bottom:` la
+altura de `.tabbar`) y mover los botones `auto-ocr-ia-cont` y
+`auto-manual` de `index.html` ahí, sin tocar `.scan-stage`.
