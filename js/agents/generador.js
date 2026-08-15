@@ -291,7 +291,17 @@ const AgenteGenerador = (() => {
   /* =====================================================================
      GENERACIÓN
      ===================================================================== */
-  async function generar(enriquecidos, { intentos = 2 } = {}) {
+  /* Cuántas veces se le vuelve a pedir al modelo cuando la primera receta no
+     pasa el validador. Reintentar contra Ollama es gratis: corre en la
+     máquina del usuario. Contra Gemini cada intento consume un pedido del
+     plan gratuito —que se mide POR DÍA, no por uso— así que un reintento
+     silencioso significaba gastar el doble de una cuota escasa sin que
+     nadie lo pidiera, y llegar al tope a la mitad de clics. */
+  function intentosPorDefecto() {
+    return leerConfig().motor === 'gemini' ? 1 : 2;
+  }
+
+  async function generar(enriquecidos, { intentos = intentosPorDefecto() } = {}) {
     const prefs = DB.get('preferences', {});
     const perfilEstilo = DB.get('stylePreferences', null);
     const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;
@@ -340,7 +350,7 @@ const AgenteGenerador = (() => {
      pasar `validar()`. Si el modelo "se olvidó" de alguno, se descarta —
      mismo principio que el resto del archivo, aplicado a un requisito
      nuevo (cobertura completa) además de a la seguridad alimentaria. */
-  async function generarParaVencer(enriquecidos, prioritarios, { intentos = 2 } = {}) {
+  async function generarParaVencer(enriquecidos, prioritarios, { intentos = intentosPorDefecto() } = {}) {
     const prefs = DB.get('preferences', {});
     const perfilEstilo = DB.get('stylePreferences', null);
     const perfilHogar = typeof AgenteHogar !== 'undefined' ? AgenteHogar.perfilCombinado() : null;

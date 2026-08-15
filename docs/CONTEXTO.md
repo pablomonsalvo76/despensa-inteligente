@@ -725,3 +725,47 @@ recetario fijo siguió respondiendo sin conexión y sin modelo. Es el "piso
 garantizado" haciendo exactamente lo que promete.
 
 11 chequeos nuevos (323 en 8 suites). sw `v44`.
+
+### El bucle de los 50 segundos — 2026-08-15
+
+**Síntoma**: «esperá 50 segundos», se esperan, y vuelve a empezar la cuenta.
+Nunca se libera.
+
+**Causa.** Hay DOS cuotas gratuitas distintas y el error las reporta casi
+igual, con un `retryDelay` de pocos segundos en los dos casos:
+
+| Cuota | Se libera |
+|---|---|
+| Por minuto (RPM) | esperando los segundos que indica |
+| **Por día (RPD)** | **a la medianoche del Pacífico** (~5 AM en Argentina) |
+
+Confirmado en la documentación de Google: *"Requests per day (RPD) quotas
+reset at midnight Pacific time"* y *"Rate limits are applied per project,
+not per API key"*. Con la cuota diaria agotada, esperar el `retryDelay` no
+sirve: se vuelve a fallar y a mostrar otra espera corta. La app repetía esa
+promesa falsa y mandaba al usuario a esperar para fallar de nuevo.
+
+`traducirError` ahora mira el nombre de la métrica (`..._per_day`) y dice
+la verdad: se renueva mañana. Y en el caso por minuto agrega «si vuelve a
+pasar, es el tope diario», porque no siempre se puede distinguir.
+
+**Y una causa de consumo que era nuestra.** `generar` y `generarParaVencer`
+usaban `intentos = 2`: si la primera receta no pasaba el validador, se le
+volvía a pedir al modelo en silencio. Contra Ollama eso es gratis —corre en
+la máquina del usuario— pero contra Gemini **cada intento consume un pedido
+de una cuota que se mide por día**. Cada clic gastaba dos, y se llegaba al
+tope con la mitad de los clics. Ahora `intentosPorDefecto()` devuelve 1 con
+Gemini y 2 con Ollama.
+
+**Presupuesto real a tener en cuenta**: la cuota es POR PROYECTO y la
+comparten las recetas y el botón "Leer con IA" del escáner. Los límites
+concretos del proyecto se ven en `aistudio.google.com/rate-limit`.
+
+**Riesgo para la demostración**: si el profesor prueba la app después de
+una sesión de pruebas, puede encontrarse la cuota agotada. Mitigaciones,
+de menor a mayor esfuerzo: probar temprano en el día; habilitar facturación
+en el proyecto (el uso real de una demo cuesta centavos y los límites suben
+mucho); o apoyarse en que el recetario fijo funciona sin cuota ni conexión
+—que es exactamente lo que la arquitectura en dos capas garantiza—.
+
+5 chequeos nuevos (328 en 8 suites). sw `v45`.

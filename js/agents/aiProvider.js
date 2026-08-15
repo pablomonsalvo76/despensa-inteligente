@@ -181,10 +181,22 @@ const AIProvider = (() => {
     const texto = String((e && e.message) || e || '');
 
     if (/\b429\b|quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(texto)) {
+      /* Hay DOS cuotas distintas y el error las reporta casi igual, con un
+         `retryDelay` de pocos segundos en los dos casos. Pero la diaria no
+         se libera esperando: según la documentación de Google, las cuotas
+         por día se reinician a medianoche del Pacífico. Repetir el
+         "probá en 50 segundos" ahí es mentirle al usuario y hacerlo
+         esperar para volver a fallar, que fue justo lo que pasó. */
+      if (/per[_ ]?day|perday|_day\b|daily/i.test(texto)) {
+        return new Error('Se agotó la cuota gratuita del modelo POR HOY '
+          + '(se renueva a la medianoche del Pacífico, cerca de las 5 AM en Argentina). '
+          + 'El recetario sigue funcionando sin el modelo.');
+      }
       const m = texto.match(/retry in ([\d.]+)\s*s/i) || texto.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
       const espera = m ? Math.ceil(Number(m[1])) : null;
       return new Error(espera
-        ? `Se llegó al límite de uso gratuito del modelo. Probá de nuevo en ${espera} segundo${espera === 1 ? '' : 's'}.`
+        ? `Se llegó al límite de uso gratuito del modelo. Probá de nuevo en ${espera} segundo${espera === 1 ? '' : 's'}; `
+          + 'si vuelve a pasar, es el tope diario y se renueva mañana.'
         : 'Se agotó la cuota gratuita del modelo por ahora. El recetario sigue funcionando sin el modelo.');
     }
     if (/\b5\d\d\b|UNAVAILABLE|overloaded/i.test(texto)) {

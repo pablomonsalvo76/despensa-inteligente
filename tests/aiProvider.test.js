@@ -194,9 +194,26 @@ async function chequearAsync(desc, fn) {
       + '[{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas"}]}]';
 
     const cuota = t(new Error(CUOTA));
-    chequear('la cuota agotada se explica en una frase', cuota.length < 120, `${cuota.length} caracteres`);
+    chequear('la cuota agotada se explica en una frase', cuota.length < 180, `${cuota.length} caracteres`);
     chequear('y dice cuánto esperar', /9 segundos/.test(cuota), cuota);
     chequear('sin volcar el JSON del error', !/@type|googleapis/.test(cuota), cuota);
+    // Aunque el error traiga un retryDelay corto, puede ser el tope diario:
+    // esperar no lo libera y el usuario quedaba en un bucle de 50 segundos.
+    chequear('avisa que si se repite es el tope diario',
+      /tope diario|mañana/i.test(cuota), cuota);
+
+    /* La cuota POR DÍA no se libera esperando —Google la reinicia a la
+       medianoche del Pacífico— pero el error la reporta con un retryDelay
+       de segundos igual que la cuota por minuto. Prometer la espera corta
+       ahí es mandar al usuario a fallar de nuevo. */
+    const DIARIA = 'Quota exceeded for metric: generativelanguage.googleapis.com/'
+      + 'generate_content_free_tier_requests_per_model_per_day, limit: 20, '
+      + 'model: gemini-3.6-flash Please retry in 47.3s. [429]';
+    const diaria = t(new Error(DIARIA));
+    chequear('la cuota diaria NO promete una espera de segundos',
+      !/\d+ segundos/.test(diaria), diaria);
+    chequear('la cuota diaria dice cuándo se renueva',
+      /hoy/i.test(diaria) && /medianoche/i.test(diaria), diaria);
 
     chequear('cuota sin tiempo sugerido ofrece la alternativa offline',
       /recetario/i.test(t(new Error('[429] RESOURCE_EXHAUSTED'))), t(new Error('[429] RESOURCE_EXHAUSTED')));
