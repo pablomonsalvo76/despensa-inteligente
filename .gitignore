@@ -23,6 +23,12 @@ Desktop.ini
 .idea/
 *.swp
 
+# Configuración de herramientas del asistente de programación (gentle-ai).
+# Son 75 archivos de tooling que no son trabajo propio del TP: mismo
+# criterio que android-build/, no ensuciar la historia que evalúa el
+# docente. Se regeneran con `gentle-ai install --scope workspace`.
+.claude/
+
 # Temporales
 *.log
 *.tmp
