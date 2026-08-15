@@ -368,10 +368,29 @@ button { font-family: inherit; }
   box-shadow: 0 0 0 999px rgba(0,0,0,0.28);
   pointer-events: none;
   transition: inset 0.35s ease;
+  /* Oculto mientras no hay cámara: es una guía para apuntar, y sin video
+     detrás queda un rectángulo blanco flotando en el vacío que además
+     cruzan los pasos superpuestos. `camaraActiva()` pone `.con-video`. */
+  display: none;
 }
+.scan-stage.con-video .scan-frame { display: block; }
 /* En el paso de la fecha se angosta: obliga a acercar la cámara al texto
    chico, que es justo lo que el OCR necesita para leerlo. */
 .scan-stage.paso-fecha .scan-frame { inset: 32% 12%; }
+
+/* Cuadro en reposo: sin cámara, un fondo plano y una leyenda en el centro
+   dicen "acá va a aparecer la imagen" mucho mejor que un rectángulo negro. */
+.scan-stage:not(.con-video) {
+  background: var(--surface-alt);
+  border: 1px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.scan-stage:not(.con-video)::before {
+  content: 'La cámara se enciende al tocar “Iniciar escáner”';
+  max-width: 60%; text-align: center;
+  font-size: 12.5px; font-weight: 600; color: var(--text-soft);
+  line-height: 1.5;
+}
 
 /* Texto crudo del OCR. Sin poder ver qué leyó realmente la cámara, un fallo
    de lectura es indistinguible de un fallo del programa. */

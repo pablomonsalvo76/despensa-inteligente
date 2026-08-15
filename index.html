@@ -176,7 +176,11 @@
                 <div class="scan-step" id="step-codigo">
                   <span class="ss-dot"></span>
                   <span class="ss-txt">Código de barras</span>
-                  <span class="ss-val">buscando…</span>
+                  <!-- "en espera" hasta que la cámara arranque: antes decía
+                       "buscando…" con el escáner apagado, lo que en el cuadro
+                       en reposo se lee como que el sistema ya está haciendo
+                       algo. El JS lo pasa a "buscando…" al iniciar. -->
+                  <span class="ss-val">en espera</span>
                 </div>
                 <div class="scan-step" id="step-nombre">
                   <span class="ss-dot"></span>

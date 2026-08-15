@@ -611,6 +611,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stage) stage.classList.toggle('paso-fecha', activo);
   }
 
+  /* El recuadro de encuadre es una guía PARA APUNTAR: sin video detrás es
+     un rectángulo blanco flotando sobre negro, que además cruzan los pasos
+     superpuestos. Se muestra sólo mientras hay cámara. */
+  function camaraActiva(activo) {
+    const stage = document.querySelector('.scan-stage');
+    if (stage) stage.classList.toggle('con-video', activo);
+  }
+
   async function iniciarEscanerAuto() {
     if (typeof Html5Qrcode === 'undefined') {
       toast('No se pudo cargar el lector (¿sin conexión?). Usá "Sólo código" o carga manual.');
@@ -647,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pasoEstado('step-nombre', 'buscando', 'buscando…');
     pasoEstado('step-fecha', 'buscando', 'buscando…');
     encuadreFecha(false);
+    camaraActiva(true);
     anunciar('Mostrame el producto', 'Código, nombre o fecha: leo lo que encuentre');
     set('auto-status', 'textContent', 'Cámara activa. Movelo despacio: no hay un orden obligatorio, voy completando lo que vaya reconociendo.');
 
@@ -859,6 +868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     codigoYaLeido = false;
     encuadreFecha(false);
+    camaraActiva(false);
     set('auto-start', 'hidden', false);
     set('auto-stop', 'hidden', true);
     ocultarBotonVisionIAAuto(); // la cámara se cierra acá, el botón ya no tiene de dónde sacar un frame
