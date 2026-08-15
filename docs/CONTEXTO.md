@@ -498,3 +498,48 @@ Próximo paso si se retoma: implementar la barra fija en
 `css/styles.css` (`.sticky-actions`, con `position: sticky; bottom:` la
 altura de `.tabbar`) y mover los botones `auto-ocr-ia-cont` y
 `auto-manual` de `index.html` ahí, sin tocar `.scan-stage`.
+
+### El Cocinero completa con lo que ya hay en la casa — 2026-08-15
+
+**Problema.** El Generador ya recibía la despensa entera (`disponibles` =
+todo lo no vencido), así que técnicamente podía combinar lo que vence con
+el resto. Pero faltaban las dos mitades que hacen que eso sirva:
+
+1. El prompt sólo insistía en los productos obligatorios y agregaba un
+   tibio "podés sumar otros si hace falta". Un modelo al que se le dice
+   "usá la espinaca" devuelve *espinaca salteada* — cuando el usuario
+   tenía queso y huevos ahí al lado para una tarta.
+2. La receta se mostraba como una lista plana de ingredientes. El usuario
+   igual tenía que ir a revisar la heladera para saber si le alcanzaba,
+   que es justo el trabajo que la app promete ahorrarle.
+
+**Solución, repartida según quién sabe qué.**
+
+- `generador.js` → `armarPrompt`: la lista de la despensa ahora lleva la
+  ubicación (`- queso (en Heladera, vence en 20 día/s)`) y el pedido
+  explícito de completar el plato con el resto. La ubicación no es
+  decorativa: lo que está en el Freezer necesita descongelarse, y una
+  receta que no lo dice no se puede seguir — el prompt lo exige como
+  primer paso.
+- `cocinero.js` → `desglosarIngredientes(receta, invMap, prioritarios)` y
+  `fraseDisponibilidad(desglose)` (nuevos): separan lo que se vence, lo
+  que complementa desde el stock (agrupado por dónde ir a buscarlo) y lo
+  que falta comprar. **Es cálculo determinístico sobre el inventario, no
+  algo que se le pregunte al modelo**: la ubicación la cargó el usuario y
+  el sistema ya la sabe. Al modelo se le pide la receta, no el estado de
+  la despensa. Vale igual para recetas del catálogo y generadas.
+- `evaluarCandidatas` adjunta `desglose` a cada candidata, así que la UI
+  no reconstruye inventario por su cuenta.
+- UI (`#rd-despensa` en el detalle, y la tarjeta del combo): *"Se hace con
+  espinaca que se te vence, queso y huevos que tenés en la heladera y
+  arroz que tenés en la alacena. No te falta nada."*
+
+**Qué NO se hizo, a propósito.** No se le pide al modelo que informe
+ubicaciones ni faltantes. Pedirle un dato que uno ya tiene es la forma
+más fácil de que lo devuelva mal, y encima no se puede verificar sin
+volver al inventario — con lo cual conviene leerlo del inventario y
+listo. Mismo criterio que el resto del archivo: el modelo propone la
+receta, el código dice la verdad sobre la despensa.
+
+19 chequeos nuevos entre `tests/recomendacion.test.js` y
+`tests/generacion.test.js` (266 en total, 8 suites). sw `v41`.

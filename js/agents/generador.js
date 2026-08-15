@@ -174,9 +174,14 @@ const AgenteGenerador = (() => {
   // sí o sí — y el código lo vuelve a chequear después (ver más abajo),
   // porque pedirlo en el prompt no lo garantiza.
   function armarPrompt(disponibles, perfilEstilo, prefs, obligatorios = []) {
+    // La ubicación va en la lista por una razón de cocina, no de prolijidad:
+    // un ingrediente que está en el freezer necesita descongelarse, y una
+    // receta que no lo dice no se puede seguir. Al modelo se le da el dato
+    // para que lo incorpore a los pasos; quién le cuenta al usuario dónde
+    // está cada cosa es el Cocinero (`desglosarIngredientes`), no el modelo.
     const lista = [...disponibles.values()]
       .sort((a, b) => a.daysRemaining - b.daysRemaining)
-      .map((p) => `- ${sanitizar(p.name)} (vence en ${p.daysRemaining} día/s)`)
+      .map((p) => `- ${sanitizar(p.name)} (en ${sanitizar(p.location || 'Heladera')}, vence en ${p.daysRemaining} día/s)`)
       .join('\n');
 
     const gustos = [];
@@ -198,8 +203,18 @@ const AgenteGenerador = (() => {
       'Sos un cocinero que evita el desperdicio de alimentos.',
       'Creá UNA receta usando SOLAMENTE los ingredientes de esta lista.',
       nombresObligatorios.length
-        ? `La receta TIENE que usar TODOS estos productos, sin excepción: ${nombresObligatorios.join(', ')}. Podés sumar otros de la lista si hace falta para que el plato tenga sentido.`
+        ? `La receta TIENE que usar TODOS estos productos, sin excepción: ${nombresObligatorios.join(', ')}.`
         : 'Priorizá los que vencen antes.',
+      // El pedido explícito de completar con el resto de la despensa. Sin
+      // esto el modelo tiende a cocinar SÓLO con lo obligatorio y devuelve
+      // platos pobres —"espinaca salteada"— cuando el usuario tenía queso y
+      // huevos ahí al lado para una tarta. Aprovechar lo que ya está en la
+      // casa es justamente el objetivo de la app.
+      'Completá la receta con los demás ingredientes de la lista que hagan',
+      'falta para que sea un plato de verdad y no una mezcla forzada.',
+      'Preferí los que ya están en la casa antes que una versión más pobre',
+      'del plato. Si usás algo que está en Freezer, el primer paso tiene que',
+      'ser descongelarlo.',
       '',
       'DESPENSA:', lista,
       '', `Podés asumir que hay: ${BASICOS.join(', ')}.`,

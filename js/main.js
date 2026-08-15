@@ -1584,7 +1584,7 @@ document.addEventListener('DOMContentLoaded', () => {
      siempre un botón explícito, porque tiene costo y manda datos afuera. */
   let paraVencerCache = { combo: null, individuales: [], prioritarios: [] };
 
-  function candidataDesdeGenerada(receta, prioritarios) {
+  function candidataDesdeGenerada(receta, prioritarios, enriquecidos) {
     return {
       receta,
       ingredientesUsados: receta.ingredients,
@@ -1592,6 +1592,10 @@ document.addEventListener('DOMContentLoaded', () => {
       rescataPrioritario: prioritarios.length > 0,
       productoPrioritario: prioritarios.length === 1 ? prioritarios[0] : null,
       hogar: { advertencias: [] },
+      // Misma cuenta que para una receta del catálogo: la receta la propuso
+      // el modelo, pero dónde está cada ingrediente lo sabe el inventario.
+      desglose: AgenteCocinero.desglosarIngredientes(
+        receta, AgenteCocinero.inventarioDisponible(enriquecidos || []), prioritarios),
       ingredientesUrgentes: prioritarios.map((p) => p.name)
     };
   }
@@ -1614,7 +1618,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `<div class="card">
           <div class="priority-flag">Usa ${r.combo.rescatados} de ${r.prioritarios.length} productos por vencer</div>
           <h4>${escapeHtml(r.combo.receta.name)}</h4>
-          <div class="rb-uses">${r.combo.ingredientesUsados.map(escapeHtml).join(', ')}</div>
+          <div class="rb-uses">${escapeHtml(
+            AgenteCocinero.fraseDisponibilidad(r.combo.desglose)
+            || r.combo.ingredientesUsados.join(', '))}</div>
           <button class="btn btn-outline btn-block" id="pv-combo-ver">Ver receta</button>
         </div>`
       : `<div class="card">
@@ -1663,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const res = await AgenteGenerador.generarParaVencer(enriquecidos, paraVencerCache.prioritarios);
           if (res.receta) {
-            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, paraVencerCache.prioritarios));
+            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, paraVencerCache.prioritarios, enriquecidos));
           } else {
             const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
             if (estado) estado.textContent = `No se pudo generar una que los use a todos.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
@@ -1687,7 +1693,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const res = await AgenteGenerador.generarParaVencer(enriquecidos, [producto]);
           if (res.receta) {
-            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, [producto]));
+            abrirRecetaCandidata(candidataDesdeGenerada(res.receta, [producto], enriquecidos));
           } else {
             const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
             if (estado) estado.textContent = `No se pudo generar una receta con ${nombre}.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
@@ -1729,6 +1735,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const p = c.productoPrioritario;
       rescate.textContent = `Rescata ${p.name} — ${p.daysRemaining <= 0 ? 'vence hoy' : `vence en ${p.daysRemaining} día(s)`}`;
     } else rescate.hidden = true;
+
+    /* "Con lo que ya tenés": responde la pregunta que sigue inmediatamente
+       a "esta receta rescata tu espinaca" — ¿y me alcanza con lo que hay?
+       Sin esto el usuario tiene que ir a revisar la heladera para saber si
+       la sugerencia es realizable, que es exactamente el trabajo que la app
+       existe para ahorrarle. */
+    const despensa = find('rd-despensa');
+    if (despensa) {
+      const frase = c.desglose ? AgenteCocinero.fraseDisponibilidad(c.desglose) : '';
+      despensa.hidden = !frase;
+      if (frase) {
+        despensa.innerHTML = c.desglose.completa
+          ? `<strong>Ya tenés todo.</strong> ${escapeHtml(frase.replace(' No te falta nada.', ''))}`
+          : escapeHtml(frase) +
+            ` <span class="rd-falta">Te falta: ${escapeHtml(c.desglose.faltantes.join(', '))}.</span>`;
+      }
+    }
 
     // Advertencias del hogar: para quién no sirve o qué cuidar.
     // Los bloqueos no aparecen acá porque esas recetas ni se sugieren.

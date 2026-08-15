@@ -674,6 +674,16 @@ html[data-theme="dark"] .priority-flag { color: var(--accent); }
   font-weight: 700; margin-bottom: 14px;
 }
 html[data-theme="dark"] .rd-rescue { color: var(--accent); }
+/* Deliberadamente más sobrio que .rd-rescue: la urgencia la comunica el
+   rescate, esto es la respuesta a "¿me alcanza con lo que tengo?" y no
+   debe competir por atención con lo que está por vencer. */
+.rd-despensa {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px; font-size: 12.5px; line-height: 1.5;
+  color: var(--text-soft); margin-bottom: 14px;
+}
+.rd-despensa strong { color: var(--verde); font-weight: 700; }
+.rd-despensa .rd-falta { color: var(--rojo); font-weight: 600; }
 .ing-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 11px 2px; border-bottom: 1px solid var(--border); font-size: 13.5px;

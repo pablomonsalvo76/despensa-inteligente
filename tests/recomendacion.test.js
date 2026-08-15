@@ -64,10 +64,10 @@ function nuevoContexto() {
 // ---- Helpers ----
 const HOY = new Date();
 /** Producto "enriquecido" tal como lo entrega AgenteVencimientos.analyze(). */
-function prod(name, diasRestantes, category = 'otros') {
+function prod(name, diasRestantes, category = 'otros', location = 'Heladera') {
   const venc = new Date(HOY.getTime() + diasRestantes * 86400000);
   return {
-    id: 'p_' + name, name, category, quantity: 1,
+    id: 'p_' + name, name, category, quantity: 1, location,
     expiryDate: venc.toISOString().slice(0, 10),
     status: 'activo', addedDate: HOY.toISOString(),
     daysRemaining: diasRestantes,
@@ -254,6 +254,85 @@ function chequear(desc, condicion, detalle) {
 
   chequear('un id inexistente no rompe',
     AgenteCocinero.alternativasA('r99', inventario).length === 0, 'devolvió algo');
+}
+
+/* =======================================================================
+   Desglose de despensa — "¿me alcanza con lo que tengo, y dónde está?"
+   -----------------------------------------------------------------------
+   Una receta que rescata lo que vence casi nunca se hace sólo con eso.
+   Si el usuario tiene que ir a revisar la heladera para saber si la
+   sugerencia es realizable, la app no le ahorró el trabajo que promete.
+   ===================================================================== */
+{
+  const api = nuevoContexto();
+  const { AgenteCocinero, RECIPES } = api;
+
+  // r13 = arroz con leche (arroz, leche, azucar, canela).
+  const receta = RECIPES.find((r) => r.id === 'r13');
+  const inventario = [
+    prod('leche', 1, 'lacteos', 'Heladera'),    // rojo: es lo que se vence
+    prod('arroz', 200, 'cereales', 'Alacena'),
+    prod('azucar', 300, 'conservas', 'Alacena')
+    // canela no está: es lo que falta
+  ];
+  const invMap = AgenteCocinero.inventarioDisponible(inventario);
+  const d = AgenteCocinero.desglosarIngredientes(receta, invMap, [inventario[0]]);
+
+  chequear('separa lo que se vence de lo que sólo complementa',
+    d.porVencer.length === 1 && d.porVencer[0].nombre === 'leche',
+    `porVencer=${JSON.stringify(d.porVencer.map((x) => x.nombre))}`);
+  chequear('los complementos son los que ya tenía sin urgencia',
+    d.complementos.length === 2, `complementos=${d.complementos.length}`);
+  chequear('agrupa los complementos por dónde ir a buscarlos',
+    d.porUbicacion.Alacena && d.porUbicacion.Alacena.length === 2,
+    `porUbicacion=${JSON.stringify(d.porUbicacion)}`);
+  chequear('lo que no está en la despensa queda como faltante',
+    d.faltantes.length === 1 && /canela/.test(d.faltantes[0]),
+    `faltantes=${JSON.stringify(d.faltantes)}`);
+  chequear('con un faltante la receta NO se marca como completa',
+    d.completa === false, `completa=${d.completa}`);
+
+  const frase = AgenteCocinero.fraseDisponibilidad(d);
+  chequear('la frase nombra el producto por vencer', /leche/.test(frase), frase);
+  chequear('la frase dice dónde están los complementos', /alacena/i.test(frase), frase);
+  chequear('sin todo no promete que no falte nada', !/no te falta nada/i.test(frase), frase);
+
+  // Con la canela cargada, la promesa cambia: se puede cocinar YA.
+  const completo = AgenteCocinero.inventarioDisponible(
+    inventario.concat([prod('canela', 400, 'conservas', 'Alacena')]));
+  const d2 = AgenteCocinero.desglosarIngredientes(receta, completo, [inventario[0]]);
+  chequear('con todos los ingredientes la receta se marca completa',
+    d2.completa === true && d2.faltantes.length === 0, `faltantes=${JSON.stringify(d2.faltantes)}`);
+  chequear('y ahí sí avisa que no falta nada',
+    /no te falta nada/i.test(AgenteCocinero.fraseDisponibilidad(d2)),
+    AgenteCocinero.fraseDisponibilidad(d2));
+
+  // Los básicos de cocina no cuentan como faltantes: nadie carga la sal.
+  const conSal = { id: 'x', name: 'prueba', ingredients: ['leche', 'sal'], critical: [], steps: [], tags: [] };
+  const d3 = AgenteCocinero.desglosarIngredientes(conSal, invMap, []);
+  chequear('la sal no se reporta como ingrediente faltante',
+    d3.faltantes.length === 0 && d3.basicos.length === 1, `faltantes=${JSON.stringify(d3.faltantes)}`);
+
+  // Un producto en rojo/amarillo cuenta como rescate aunque no fuera el que
+  // motivó el pedido: el semáforo manda, no la lista que se pasó por parámetro.
+  const d4 = AgenteCocinero.desglosarIngredientes(receta, invMap, []);
+  chequear('el semáforo define qué se vence, no el parámetro',
+    d4.porVencer.length === 1 && d4.porVencer[0].nombre === 'leche',
+    `porVencer=${JSON.stringify(d4.porVencer.map((x) => x.nombre))}`);
+
+  // Robustez: una receta sin nada en común con la despensa no debe romper
+  // ni inventar una frase que afirme algo falso.
+  const ajena = { id: 'y', name: 'ajena', ingredients: ['kiwi'], critical: [], steps: [], tags: [] };
+  const d5 = AgenteCocinero.desglosarIngredientes(ajena, invMap, []);
+  chequear('sin nada de la despensa no arma frase',
+    AgenteCocinero.fraseDisponibilidad(d5) === '', `devolvió "${AgenteCocinero.fraseDisponibilidad(d5)}"`);
+
+  // Las candidatas del ranking ya traen el desglose calculado: la UI no
+  // tiene que reconstruir el inventario por su cuenta.
+  const sugeridas = AgenteCocinero.suggestRecipes(inventario);
+  chequear('las candidatas sugeridas incluyen el desglose',
+    sugeridas.length > 0 && sugeridas[0].desglose && Array.isArray(sugeridas[0].desglose.porVencer),
+    `desglose=${JSON.stringify(sugeridas[0] && sugeridas[0].desglose)}`);
 }
 
 /* =======================================================================

@@ -145,6 +145,89 @@ const AgenteCocinero = (() => {
     return bonusPrioritario + urgencyScore * 2 + coverageRatio - penalizacion;
   }
 
+  /* ---- De dónde sale cada cosa -----------------------------------------
+     Una receta que rescata lo que vence casi nunca se hace sólo con eso:
+     necesita un par de cosas más, y esas cosas normalmente ya están en la
+     casa. Decirlo cambia la decisión del usuario. No es lo mismo "hacé una
+     tarta de espinaca" —que obliga a ir a revisar la heladera a ver si
+     alcanza— que "tenés la espinaca por vencer, y el queso y los huevos en
+     la heladera: te da para la tarta". Lo segundo se puede cocinar ahora.
+
+     Esto se calcula acá, sobre el inventario real, y no se le pregunta al
+     modelo: la ubicación la cargó el usuario y el sistema ya la sabe. Al
+     modelo se le pide la receta, no el estado de la despensa — pedirle un
+     dato que uno tiene es la forma más fácil de que lo devuelva mal.
+     -------------------------------------------------------------------- */
+  const BASICOS_COCINA = new Set(['sal', 'agua', 'pimienta']);
+  const ARTICULO = { Heladera: 'la heladera', Freezer: 'el freezer', Alacena: 'la alacena' };
+
+  function desglosarIngredientes(receta, invMap, prioritarios = []) {
+    const urgentes = new Set((prioritarios || []).map((p) => normalizeName(p.name)));
+    const porVencer = [];
+    const complementos = [];
+    const basicos = [];
+    const faltantes = [];
+
+    (receta.ingredients || []).forEach((ing) => {
+      const norm = normalizeName(ing);
+      const producto = invMap.get(norm);
+      if (!producto) {
+        (BASICOS_COCINA.has(norm) ? basicos : faltantes).push(ing);
+        return;
+      }
+      const item = {
+        nombre: producto.name,
+        ubicacion: producto.location || 'Heladera',
+        daysRemaining: producto.daysRemaining
+      };
+      // "Por vencer" lo define el mismo semáforo de vencimientos.js, no una
+      // lista aparte: un producto en rojo o amarillo cuenta como rescate
+      // aunque no fuera de los que motivaron este pedido.
+      if (urgentes.has(norm) || producto.urgencia === 'rojo' || producto.urgencia === 'amarillo') {
+        porVencer.push(item);
+      } else {
+        complementos.push(item);
+      }
+    });
+
+    porVencer.sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+    // Agrupados por dónde hay que ir a buscarlos, que es como se cocina de
+    // verdad: la heladera se abre una vez, no una vez por ingrediente.
+    const porUbicacion = {};
+    complementos.forEach((c) => {
+      (porUbicacion[c.ubicacion] = porUbicacion[c.ubicacion] || []).push(c.nombre);
+    });
+
+    return {
+      porVencer, complementos, porUbicacion, basicos, faltantes,
+      // "Completa" = se puede cocinar ahora mismo, sin comprar nada.
+      completa: faltantes.length === 0
+    };
+  }
+
+  function enumerar(lista) {
+    if (lista.length <= 1) return lista[0] || '';
+    return lista.slice(0, -1).join(', ') + ' y ' + lista[lista.length - 1];
+  }
+
+  /** La frase que el Cocinero le dice al usuario sobre su propia despensa. */
+  function fraseDisponibilidad(desglose) {
+    if (!desglose || (!desglose.porVencer.length && !desglose.complementos.length)) return '';
+
+    const partes = [];
+    if (desglose.porVencer.length) {
+      const nombres = enumerar(desglose.porVencer.map((p) => p.nombre.toLowerCase()));
+      partes.push(`${nombres} que ${desglose.porVencer.length === 1 ? 'se te vence' : 'se te vencen'}`);
+    }
+    Object.entries(desglose.porUbicacion).forEach(([lugar, items]) => {
+      partes.push(`${enumerar(items.map((i) => i.toLowerCase()))} que tenés en ${ARTICULO[lugar] || lugar.toLowerCase()}`);
+    });
+
+    const frase = `Se hace con ${enumerar(partes)}.`;
+    return desglose.completa ? `${frase} No te falta nada.` : frase;
+  }
+
   /* ---- Evaluación de candidatas (compartida) ---------------------------
      Filtra la base de recetas contra restricciones/seguridad/hogar y les
      asigna puntaje. La usan tanto `suggestRecipes` (el ranking general)
@@ -181,6 +264,10 @@ const AgenteCocinero = (() => {
           productoPrioritario: rescataPrioritario ? productoPrioritario : null,
           ingredientesUsados: usados,
           faltantes: r.ingredients.filter((ing) => !invMap.has(normalizeName(ing))),
+          // Qué se rescata, qué se complementa con lo que ya hay y dónde
+          // está cada cosa. Va en la candidata para que la UI no tenga que
+          // reconstruir el inventario por su cuenta.
+          desglose: desglosarIngredientes(r, invMap, productoPrioritario ? [productoPrioritario] : []),
           hogar,
           // Ingredientes que la receta rescata, ordenados por urgencia real
           ingredientesUrgentes: usados
@@ -361,6 +448,7 @@ const AgenteCocinero = (() => {
   return {
     suggestRecipes, recetasParaVencer, descartarReceta, alternativasA,
     restaurarDescartadas, listarDescartadas,
+    desglosarIngredientes, fraseDisponibilidad,
     afinidadEstilo, BONUS_PRIORITARIO, MAX_AFINIDAD,
     // Lo usa el Agente Generador: la exclusión de vencidos es la regla de
     // seguridad más importante y tiene que vivir en un solo lugar.
