@@ -619,6 +619,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stage) stage.classList.toggle('con-video', activo);
   }
 
+  /* Salida en bruto del reconocedor de texto.
+     -----------------------------------------------------------------------
+     Antes se mostraba abierta y en primera persona: «La cámara lee: "0"».
+     Dos problemas, y el segundo es el grave:
+
+     1) La cámara no lee: interpreta el OCR. Lo que se muestra es su intento
+        en bruto mientras TODAVÍA está fallando —fragmentos sueltos, un "0",
+        un "-."—, no lo que hay frente al lente.
+     2) Al presentarlo como "lo que la cámara lee", el usuario lo compara con
+        lo que ve en pantalla, nunca coincide, y la conclusión razonable es
+        que la app está rota. Un dato pensado para dar transparencia terminaba
+        destruyendo la confianza.
+
+     Sigue estando —es lo único que permite diagnosticar por qué falló una
+     lectura— pero colapsado y nombrado por lo que realmente es. La estructura
+     se arma una sola vez y después sólo se actualiza el texto: rehacerla en
+     cada vuelta cerraría el desplegable que el usuario acaba de abrir. */
+  function mostrarLecturaCruda(texto, etiqueta) {
+    const cont = find('auto-lectura');
+    if (!cont) return;
+    const limpio = String(texto || '').replace(/\s+/g, ' ').trim();
+    if (!limpio) { cont.hidden = true; return; }
+    cont.hidden = false;
+
+    let det = cont.querySelector('details');
+    if (!det) {
+      det = document.createElement('details');
+      det.appendChild(document.createElement('summary'));
+      det.appendChild(document.createElement('pre'));
+      cont.appendChild(det);
+    }
+    det.querySelector('summary').textContent = etiqueta;
+    det.querySelector('pre').textContent = limpio.slice(0, 200);
+  }
+
+  function limpiarLecturas() {
+    const lectura = find('auto-lectura');
+    if (lectura) { lectura.hidden = true; lectura.innerHTML = ''; }
+    const crudo = find('auto-crudo');
+    if (crudo) { crudo.hidden = true; crudo.textContent = ''; }
+  }
+
   async function iniciarEscanerAuto() {
     if (typeof Html5Qrcode === 'undefined') {
       toast('No se pudo cargar el lector (¿sin conexión?). Usá "Sólo código" o carga manual.');
@@ -656,6 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pasoEstado('step-fecha', 'buscando', 'buscando…');
     encuadreFecha(false);
     camaraActiva(true);
+    limpiarLecturas(); // arranca en limpio: nada del intento anterior
     anunciar('Mostrame el producto', 'Código, nombre o fecha: leo lo que encuentre');
     set('auto-status', 'textContent', 'Cámara activa. Movelo despacio: no hay un orden obligatorio, voy completando lo que vaya reconociendo.');
 
@@ -777,14 +820,8 @@ document.addEventListener('DOMContentLoaded', () => {
           `Leyendo la fecha… ${segundosRestantes} s. Si no sale, escribila abajo — es más rápido.`);
       },
 
-      // Mostrar el texto crudo cumple dos funciones: le avisa al usuario que
-      // el sistema está haciendo algo, y es lo único que permite entender
-      // por qué falla una lectura.
       onTexto: (texto) => {
-        const cont = find('auto-crudo');
-        if (!cont || !texto) return;
-        cont.hidden = false;
-        cont.textContent = `La cámara lee: "${texto.replace(/\s+/g, ' ').trim().slice(0, 80)}"`;
+        mostrarLecturaCruda(texto, 'Ver el texto en bruto que interpretó el lector');
       },
 
       // El nombre se lee del frente del envase: es el texto más grande.
@@ -927,11 +964,11 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
-        const crudo = find('auto-crudo');
-        if (crudo && res.textoDetectado) {
-          crudo.hidden = false;
-          crudo.textContent = `La IA lee: "${res.textoDetectado.replace(/\s+/g, ' ').trim().slice(0, 80)}"`;
-        }
+        // La salida de la IA sí suele ser texto con sentido, pero va al mismo
+        // desplegable que la del OCR: son lo mismo para el usuario —el detalle
+        // de cómo se llegó al dato— y tenerlos en dos lugares distintos sólo
+        // agrega ruido a una pantalla que ya sobraba de contenido.
+        mostrarLecturaCruda(res.textoDetectado, 'Ver lo que devolvió la IA');
       } catch (e) {
         if (estado) estado.textContent = 'No se pudo hablar con el modelo (' + (e.message || e) + ').';
       }
@@ -1367,7 +1404,8 @@ document.addEventListener('DOMContentLoaded', () => {
     cont.innerHTML = '';
     const det = document.createElement('details');
     const sum = document.createElement('summary');
-    sum.textContent = 'Ver el texto que leyó la cámara';
+    // Mismo criterio que en el Escáner: la cámara no lee, interpreta el OCR.
+    sum.textContent = 'Ver el texto en bruto que interpretó el lector';
     const pre = document.createElement('pre');
     pre.textContent = texto;
     det.appendChild(sum);

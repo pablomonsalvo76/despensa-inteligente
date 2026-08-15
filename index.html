@@ -207,7 +207,12 @@
 
           <p class="hint-text" id="auto-status"></p>
           <p class="hint-text" id="auto-ocr-ia-estado"></p>
+          <!-- Aviso de corrección: una fecha DEDUCIDA nunca entra en silencio.
+               Es accionable, va siempre visible. -->
           <div id="auto-crudo" hidden></div>
+          <!-- Salida en bruto del reconocedor, colapsada: ver más abajo en
+               `mostrarLecturaCruda()` por qué no va abierta. -->
+          <div class="ocr-raw" id="auto-lectura" hidden></div>
           <button class="btn btn-outline btn-block" id="auto-manual">Escribir la fecha a mano</button>
         </div>
 
