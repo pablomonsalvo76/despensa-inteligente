@@ -920,6 +920,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cont) cont.hidden = true;
   }
 
+  /* Nombre y categoría salen del mismo reconocimiento, así que se completan
+     juntos y con la misma regla en las dos vías (Escáner y Foto): se llena
+     sólo lo que esté vacío, nunca se pisa lo que el usuario ya escribió o
+     eligió. Devuelve qué quedó cargado, para poder decírselo en el mensaje
+     de estado en vez de que el campo cambie solo y en silencio. */
+  function completarIdentificacion(nombre) {
+    if (!nombre) return '';
+    const campoNombre = find('f-name');
+    if (!campoNombre || campoNombre.value.trim()) return '';
+    campoNombre.value = nombre.texto;
+
+    let detalle = `"${nombre.texto}"`;
+    const campoCat = find('f-category');
+    if (nombre.categoria && campoCat && !campoCat.value) {
+      campoCat.value = nombre.categoria;
+      detalle += ` (${nombre.categoria})`;
+    }
+    return detalle;
+  }
+
   function mostrarBotonVisionIAAuto(video) {
     const cont = find('auto-ocr-ia-cont');
     const btn = find('auto-ocr-ia');
@@ -945,23 +965,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if (estado) estado.textContent = 'Mandando la foto al modelo de visión…';
       try {
         const res = await AgenteCaptura.leerConVisionIA(video);
+
+        // Se identifica primero para que los mensajes de abajo puedan contar
+        // lo que el modelo sí consiguió, aunque la fecha no haya salido.
+        const ident = completarIdentificacion(res.nombreDetectado);
+        if (ident) pasoEstado('step-nombre', 'listo', res.nombreDetectado.texto);
+
         if (res.motivo === 'foto_ilegible') {
           if (estado) estado.textContent = 'La cámara está muy oscura o desenfocada para que una IA la lea. Acercate más con buena luz.';
         } else if (res.fechaDetectada) {
           set('f-expiry', 'value', res.fechaDetectada);
           pasoEstado('step-fecha', 'listo', fmtFecha(res.fechaDetectada));
-          set('auto-status', 'textContent', `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`);
+          set('auto-status', 'textContent', ident
+            ? `IA: ${ident}, vence el ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcto.`
+            : `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`);
           vibrar([60, 40, 60]);
         } else if (estado) {
-          estado.textContent = 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
-        }
-
-        if (res.nombreDetectado) {
-          const campoNombre = find('f-name');
-          if (campoNombre && !campoNombre.value.trim()) {
-            campoNombre.value = res.nombreDetectado.texto;
-            pasoEstado('step-nombre', 'listo', res.nombreDetectado.texto);
-          }
+          estado.textContent = ident
+            ? `Identifiqué ${ident}, pero no encontré la fecha. Cargala a mano abajo.`
+            : 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
         }
 
         // La salida de la IA sí suele ser texto con sentido, pero va al mismo
@@ -1376,17 +1398,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (estado) estado.textContent = 'Mandando la foto al modelo de visión…';
       try {
         const res = await AgenteCaptura.leerConVisionIA(fuente);
+        const ident = completarIdentificacion(res.nombreDetectado);
+
         if (res.motivo === 'foto_ilegible') {
           if (estado) estado.textContent = 'La foto está demasiado oscura o desenfocada — ni una IA puede leer lo que no está en la imagen. Sacá otra con más luz.';
         } else if (res.fechaDetectada) {
-          set('f-expiry', 'value', res.fechaDetectada);
-          if (estado) estado.textContent = `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`;
-        } else {
-          if (estado) estado.textContent = 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
-        }
-        if (res.nombreDetectado) {
-          const campoNombre = find('f-name');
-          if (campoNombre && !campoNombre.value.trim()) campoNombre.value = res.nombreDetectado.texto;
+          if (estado) estado.textContent = ident
+            ? `IA: ${ident}, vence el ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcto.`
+            : `Fecha leída por IA: ${fmtFecha(res.fechaDetectada)}. Verificá que sea correcta.`;
+        } else if (estado) {
+          estado.textContent = ident
+            ? `Identifiqué ${ident}, pero no encontré la fecha. Cargala a mano abajo.`
+            : 'Tampoco la IA encontró una fecha. Cargala a mano abajo.';
         }
         mostrarTextoCrudo(res.textoDetectado);
       } catch (e) {

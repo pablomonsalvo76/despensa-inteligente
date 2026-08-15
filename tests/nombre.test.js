@@ -37,7 +37,7 @@ sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(codigo + '\n;globalThis.__cap = AgenteCaptura;', sandbox, { filename: 'captura.js' });
-const { extraerNombre } = sandbox.__cap;
+const { extraerNombre, identificarDesdeIA } = sandbox.__cap;
 
 /** Arma la estructura que devuelve Tesseract: líneas con alto y confianza. */
 function ocr(lineas) {
@@ -201,6 +201,58 @@ function chequear(desc, cond, detalle) {
     try { r = extraerNombre(data); } catch (e) { err = e; }
     chequear(`no rompe con ${desc}`, !err, err && err.message);
   });
+}
+
+/* ======================================================================
+   IDENTIFICACIÓN POR IA — lo que el modelo propone y el código veta
+   ----------------------------------------------------------------------
+   La vía de visión no transcribe, identifica: devuelve producto, marca y
+   categoría por separado. Nada de eso llega al formulario sin pasar por
+   `identificarDesdeIA`, que es lo que se prueba acá. Un modelo remoto no
+   es determinístico, así que la garantía no puede estar en confiar en su
+   respuesta: tiene que estar en esta función.
+   ==================================================================== */
+{
+  const r = identificarDesdeIA({
+    producto: 'mayonesa', marca: 'Hellmanns', categoria: 'conservas'
+  });
+  chequear('IA: arma el nombre con el tipo adelante',
+    r && /^mayonesa/i.test(r.texto), `devolvió "${r && r.texto}"`);
+  chequear('IA: conserva la marca', r && /hellmanns/i.test(r.texto), `devolvió "${r && r.texto}"`);
+  chequear('IA: el nombre entra al recetario', r && r.tipo === 'mayonesa', `tipo=${r && r.tipo}`);
+
+  // El catálogo local manda: aunque el modelo diga otra cosa, "leche" es lácteo.
+  const mal = identificarDesdeIA({ producto: 'leche entera', marca: 'La Serenisima', categoria: 'bebidas' });
+  chequear('IA: el catálogo local le gana a la categoría del modelo',
+    mal && mal.categoria === 'lacteos', `categoria=${mal && mal.categoria}`);
+
+  // Categoría inventada, fuera de las 9 del formulario: se descarta.
+  const inventada = identificarDesdeIA({ producto: 'algo raro', marca: 'X', categoria: 'ultraprocesados' });
+  chequear('IA: una categoría fuera de la lista se descarta',
+    inventada && inventada.categoria === null, `categoria=${inventada && inventada.categoria}`);
+
+  // Sin tipo conocido pero con categoría válida, esa sí se acepta.
+  const valida = identificarDesdeIA({ producto: 'snack de kale', marca: '', categoria: 'otros' });
+  chequear('IA: una categoría válida sin tipo conocido se acepta',
+    valida && valida.categoria === 'otros', `categoria=${valida && valida.categoria}`);
+
+  // Respuestas rotas: nunca deben romper ni devolver basura.
+  const rotas = [
+    ['objeto vacío', {}],
+    ['todo vacío', { producto: '', marca: '', categoria: '' }],
+    ['campos nulos', { producto: null, marca: null, categoria: null }],
+    ['tipos equivocados', { producto: 42, marca: ['x'], categoria: {} }]
+  ];
+  rotas.forEach(([desc, cruda]) => {
+    let res, err = null;
+    try { res = identificarDesdeIA(cruda); } catch (e) { err = e; }
+    chequear(`IA: no rompe con ${desc}`, !err, err && err.message);
+    chequear(`IA: sin datos no inventa nombre (${desc})`, !err && res === null, `devolvió ${JSON.stringify(res)}`);
+  });
+
+  // Un nombre larguísimo no puede desbordar el campo del formulario.
+  const largo = identificarDesdeIA({ producto: 'queso ' + 'x'.repeat(200), marca: 'y'.repeat(200), categoria: 'lacteos' });
+  chequear('IA: recorta nombres desmedidos', largo && largo.texto.length <= 60, `largo=${largo && largo.texto.length}`);
 }
 
 const total = ok + fallos.length;

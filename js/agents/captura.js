@@ -769,17 +769,88 @@ const AgenteCaptura = (() => {
     return cv.toDataURL('image/jpeg', 0.85).split(',')[1];
   }
 
+  // Las 9 categorías del formulario. La lista se declara acá porque cumple
+  // dos funciones: se le dicta al modelo como opciones válidas, y se usa
+  // después para vetar lo que haya contestado.
+  const CATEGORIAS_VALIDAS = [
+    'lacteos', 'verduras', 'frutas', 'carnes',
+    'cereales', 'huevos', 'conservas', 'bebidas', 'otros'
+  ];
+
+  /* ---- Qué se le pide al modelo -----------------------------------------
+     IDENTIFICAR, no transcribir. Un envase tiene decenas de textos —marca,
+     eslogan, peso neto, "sin TACC", tabla nutricional, ingredientes,
+     atención al consumidor— y pedirle "transcribí el nombre del producto"
+     devolvía cualquiera de ellos, normalmente el que estuviera impreso más
+     grande. Acá se le da el criterio que una persona aplica sin pensarlo:
+     QUÉ alimento es, de qué marca, y a qué categoría de la despensa va.
+
+     Separar `producto` de `marca` no es prolijidad: el Cocinero matchea
+     recetas por el sustantivo del alimento (`TIPOS_PRODUCTO`), así que
+     "Mayonesa Hellmanns" entra al recetario y "Hellmanns Clásica" no.
+     Armando el nombre acá abajo con el tipo adelante, ese orden queda
+     garantizado y no depende de cómo se le ocurra redactarlo al modelo.
+
+     La fecha se pide en un campo propio en vez de pescarla dentro del texto
+     completo, donde conviven el lote, la elaboración y hasta un teléfono de
+     atención al cliente. Distinguir cuál de las tres fechas es la de
+     vencimiento es exactamente lo que un modelo de visión sabe hacer y una
+     expresión regular no. */
   const PROMPT_VISION = [
-    'Mirá esta foto de un envase de alimento.',
-    'Transcribí TODO el texto que puedas leer o intuir: el nombre del',
-    'producto y cualquier fecha (vencimiento, elaboración, lote).',
-    'Muchas fechas de vencimiento están troqueladas en el plástico SIN',
-    'tinta, sólo relieve: interpretá sombras y contornos tenues, no sólo',
-    'texto impreso con contraste claro.',
-    'Respondé SOLO con JSON, sin texto alrededor:',
-    '{"textoVisible":"...","nombreProducto":"..."}',
-    'Si no distinguís nada legible, "textoVisible":"".'
-  ].join(' ');
+    'Sos un asistente que identifica alimentos envasados a partir de una foto.',
+    'Ignorá eslóganes, peso neto, tabla nutricional, lista de ingredientes,',
+    '"sin TACC", códigos de barras y textos legales: NADA de eso es el nombre.',
+    '',
+    'Respondé SOLO con este JSON, sin texto ni markdown alrededor:',
+    '{"producto":"","marca":"","categoria":"","fechaVencimiento":"","textoVisible":""}',
+    '',
+    '- "producto": QUÉ alimento es, en 1 a 3 palabras y en singular',
+    '  (ej: "mayonesa", "leche entera", "fideos tirabuzon"). Sin la marca.',
+    '- "marca": la marca comercial si se ve; vacío si no.',
+    '- "categoria": exactamente una de estas: ' + CATEGORIAS_VALIDAS.join(', ') + '.',
+    '- "fechaVencimiento": la fecha de vencimiento TAL COMO está impresa',
+    '  (ej: "23/01/27", "VTO 15 ENE 2027"). Muchas están troqueladas en el',
+    '  plástico SIN tinta, sólo relieve: interpretá sombras y contornos tenues,',
+    '  no sólo texto impreso con contraste claro. Si ves varias fechas elegí la',
+    '  de vencimiento, nunca la de elaboración ni el número de lote.',
+    '- "textoVisible": todo el texto que llegues a leer, para diagnóstico.',
+    '',
+    'Si no llegás a distinguir algo, dejá ese campo en "". No inventes datos.'
+  ].join('\n');
+
+  /* ---- Y qué se le acepta ------------------------------------------------
+     "El modelo propone, el código determinístico veta" también acá. Nada de
+     lo que contesta entra al formulario sin pasar por esta función:
+
+     - el nombre se limpia y se recorta como cualquier otro texto de entrada;
+     - la categoría sólo sobrevive si está en la lista cerrada;
+     - y sobre todo, el nombre se cruza contra `TIPOS_PRODUCTO`: si el
+       catálogo local reconoce el sustantivo, SU categoría gana sobre la que
+       propuso el modelo. No es desconfianza gratuita —es que ese catálogo es
+       el mismo que después usa el Cocinero, así que una categoría que él no
+       comparte deja al producto fuera de las recetas. */
+  function identificarDesdeIA(cruda) {
+    // Sólo strings. Coercionar con String() convertía un `42` o un `['x']` de
+    // una respuesta malformada en un nombre de producto perfectamente
+    // creíble ("42 X"), que es peor que no completar nada.
+    const campo = (v, max) => (typeof v === 'string' ? limpiarNombre(v).slice(0, max).trim() : '');
+    const producto = campo(cruda.producto, 40);
+    const marca = campo(cruda.marca, 30);
+
+    const texto = titular([producto, marca].filter(Boolean).join(' ')).slice(0, 60);
+    // Sin una sola letra no es el nombre de nada: es un peso neto o un lote.
+    if (!/[a-záéíóúñ]/i.test(texto)) return null;
+    const hallazgo = detectarTipo(producto) || detectarTipo(texto);
+    const propuesta = String(cruda.categoria || '').toLowerCase().trim();
+
+    return {
+      texto,
+      tipo: hallazgo ? hallazgo.tipo : null,
+      categoria: hallazgo ? hallazgo.categoria
+        : (CATEGORIAS_VALIDAS.includes(propuesta) ? propuesta : null),
+      confianza: 0.8
+    };
+  }
 
   /**
    * Último recurso cuando el OCR local no encontró fecha o nombre.
@@ -806,19 +877,29 @@ const AgenteCaptura = (() => {
     const cruda = AIProvider.parsearJSON(respuesta) || {};
 
     const texto = typeof cruda.textoVisible === 'string' ? cruda.textoVisible : '';
-    const fecha = texto ? extraerFecha(texto) : null;
-    const nombreTexto = typeof cruda.nombreProducto === 'string' ? cruda.nombreProducto.trim().slice(0, 60) : '';
+    const nombreDetectado = identificarDesdeIA(cruda);
 
-    if (!texto) {
+    // La fecha señalada por el modelo se prueba primero, y el texto completo
+    // queda de respaldo por si contestó el JSON a medias. Las dos pasan por
+    // `extraerFecha()`, la misma que valida forma y plausibilidad para el OCR
+    // local: venir de la IA no saltea ningún control.
+    const fechaTexto = typeof cruda.fechaVencimiento === 'string' ? cruda.fechaVencimiento : '';
+    const fecha = (fechaTexto ? extraerFecha(fechaTexto) : null)
+      || (texto ? extraerFecha(texto) : null);
+
+    // Antes esto cortaba con sólo mirar `textoVisible`, y tiraba el nombre que
+    // el modelo SÍ había identificado: justo el caso de fotografiar el frente
+    // del envase, donde hay producto y marca pero ninguna fecha a la vista.
+    if (!texto && !fecha && !nombreDetectado) {
       return { estado: 'sin_texto', textoDetectado: '', fechaDetectada: null, nombreDetectado: null, confianza: 0, motor: 'vision-ia' };
     }
     return {
       // Confianza fija y moderada-alta: el modelo no da un puntaje numérico
       // propio, y no corresponde inventarle uno más preciso del que es.
       estado: fecha ? 'ok' : 'sin_fecha',
-      textoDetectado: texto,
+      textoDetectado: texto || [nombreDetectado && nombreDetectado.texto, fechaTexto].filter(Boolean).join(' · '),
       fechaDetectada: fecha,
-      nombreDetectado: nombreTexto ? { texto: nombreTexto, confianza: 0.8 } : null,
+      nombreDetectado,
       crudo: texto,
       correccion: null,
       confianza: fecha ? 0.8 : 0,
@@ -1625,7 +1706,7 @@ const AgenteCaptura = (() => {
     estirarContraste, umbralOtsu, umbralLocalAdaptativo, cerrarPuntos,
     tieneFormaDeFecha, extraerFechaConConfianza, corregirPorPlausibilidad, tomarCorreccion,
     detenerEscaneo, estaEscaneando, preprocesar, liberarOCR, leerConPPOCR,
-    leerConVisionIA,
+    leerConVisionIA, identificarDesdeIA,
     ROI_ESCANER, ROI_FECHA, ROI_COMPLETA, ESTRATEGIAS
   };
 })();

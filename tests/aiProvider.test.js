@@ -158,7 +158,7 @@ async function chequearAsync(desc, fn) {
     const { AIProvider } = api;
 
     AIProvider.usarMotorFalso(async (llamado) => {
-      if (llamado.tipo === 'imagen') return '{"textoVisible":"vence 23/01/27","nombreProducto":"Mayonesa"}';
+      if (llamado.tipo === 'imagen') return '{"textoVisible":"vence 23/01/27","producto":"Mayonesa"}';
       return '{"name":"Test"}';
     });
     AIProvider.configurar({ motor: 'gemini' });
@@ -194,8 +194,15 @@ async function chequearAsync(desc, fn) {
     });
 
     AIProvider.configurar({ motor: 'gemini' });
-    AIProvider.usarMotorFalso(async () =>
-      '{"textoVisible":"vence 23/01/27","nombreProducto":"Mayonesa"}');
+    // Respuesta con la forma que pide el prompt: el modelo IDENTIFICA el
+    // producto (tipo, marca, categoría) y señala cuál de las fechas del
+    // envase es la de vencimiento — no devuelve un bloque de texto suelto.
+    const RESPUESTA_TIPICA = JSON.stringify({
+      producto: 'mayonesa', marca: 'Hellmanns', categoria: 'conservas',
+      fechaVencimiento: '23/01/27',
+      textoVisible: 'HELLMANNS CLASICA MAYONESA 475g LOTE L-2847 FAB 03/26 VTO 23/01/27'
+    });
+    AIProvider.usarMotorFalso(async () => RESPUESTA_TIPICA);
 
     await chequearAsync('foto sin contraste no gasta una llamada: motivo foto_ilegible', async () => {
       estadoCanvas.contraste = false;
@@ -203,23 +210,61 @@ async function chequearAsync(desc, fn) {
       return res.motivo === 'foto_ilegible' && res.estado === 'sin_texto';
     });
 
-    await chequearAsync('foto con contraste: usa extraerFecha() sobre el texto del modelo', async () => {
+    await chequearAsync('foto con contraste: usa extraerFecha() sobre la fecha que señaló el modelo', async () => {
       estadoCanvas.contraste = true;
       const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
       return res.fechaDetectada === '2027-01-23' && res.motor === 'vision-ia';
     });
 
-    await chequearAsync('el nombre detectado por visión llega recortado y con confianza', async () => {
+    await chequearAsync('la visión identifica el producto, no sólo transcribe', async () => {
       const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
-      return res.nombreDetectado && res.nombreDetectado.texto === 'Mayonesa' && res.nombreDetectado.confianza === 0.8;
+      const n = res.nombreDetectado;
+      // Tipo adelante y marca atrás: así lo matchea el Cocinero.
+      return n && /^mayonesa/i.test(n.texto) && /hellmanns/i.test(n.texto)
+        && n.categoria === 'conservas' && n.confianza === 0.8;
+    });
+
+    // REGRESIÓN: antes se cortaba si `textoVisible` venía vacío y se perdía
+    // el nombre que el modelo SÍ había identificado — el caso de fotografiar
+    // el frente del envase, donde hay producto pero ninguna fecha.
+    AIProvider.usarMotorFalso(async () =>
+      '{"producto":"leche entera","marca":"La Serenisima","categoria":"lacteos","fechaVencimiento":"","textoVisible":""}');
+    await chequearAsync('sin texto visible no se tira el producto identificado', async () => {
+      const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
+      return res.nombreDetectado && /leche/i.test(res.nombreDetectado.texto)
+        && res.nombreDetectado.categoria === 'lacteos' && res.estado === 'sin_fecha';
+    });
+
+    // La fecha del envase que NO es la de vencimiento no debe colarse: el
+    // modelo señala una y el respaldo sobre el texto completo sólo corre si
+    // ese campo vino vacío.
+    AIProvider.usarMotorFalso(async () => JSON.stringify({
+      producto: 'yogur', marca: '', categoria: 'lacteos',
+      fechaVencimiento: '15/02/27',
+      textoVisible: 'ELAB 01/01/26 LOTE 88 VTO 15/02/27'
+    }));
+    await chequearAsync('se queda con la fecha que el modelo marcó como vencimiento', async () => {
+      const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
+      return res.fechaDetectada === '2027-02-15';
     });
 
     // El modelo "alucina" una fecha sin forma válida: extraerFecha() la
     // descarta igual que descartaría una lectura de OCR local inventada.
-    AIProvider.usarMotorFalso(async () => '{"textoVisible":"folio 99 lote AX-2","nombreProducto":""}');
+    AIProvider.usarMotorFalso(async () =>
+      '{"textoVisible":"folio 99 lote AX-2","producto":"","fechaVencimiento":"99/99/99"}');
     await chequearAsync('una fecha sin forma válida no se acepta aunque la "lea" la IA', async () => {
       const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
       return res.fechaDetectada === null && res.estado === 'sin_fecha';
+    });
+
+    // Una categoría que el formulario no tiene no puede guardarse: se
+    // descarta el valor, no el producto.
+    AIProvider.usarMotorFalso(async () =>
+      '{"producto":"snack de kale","marca":"Verdex","categoria":"ultraprocesados","textoVisible":"snack"}');
+    await chequearAsync('una categoría inventada por el modelo se descarta', async () => {
+      const res = await AgenteCaptura.leerConVisionIA(FUENTE_FOTO);
+      return res.nombreDetectado && res.nombreDetectado.categoria === null
+        && /kale/i.test(res.nombreDetectado.texto);
     });
   }
 

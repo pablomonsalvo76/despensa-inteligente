@@ -306,6 +306,26 @@ local ya existente**, no reemplazada.
   pasa por `extraerFecha()`, la misma validación de forma/plausibilidad
   que ya existía: el modelo no se salta ningún control por venir de una
   vía distinta.
+- **`captura.js` → `identificarDesdeIA(cruda)`** (2026-08-15): el respaldo
+  de visión pasó de **transcribir** a **identificar**. El prompt anterior
+  pedía "transcribí el texto y el nombre del producto", y un envase tiene
+  decenas de textos —eslogan, peso neto, "sin TACC", tabla nutricional—:
+  devolvía el que estuviera impreso más grande, el mismo defecto que la
+  suite `nombre.test.js` ya había corregido para el OCR local. Ahora se le
+  piden campos separados (`producto`, `marca`, `categoria`,
+  `fechaVencimiento`, `textoVisible`) y el nombre se arma acá con el tipo
+  adelante, que es como lo matchea el Cocinero. El veto determinístico
+  cubre las tres salidas: la categoría sólo pasa si está en la lista
+  cerrada de 9 del formulario, el nombre se cruza contra `TIPOS_PRODUCTO`
+  y **gana el catálogo local** sobre lo que haya dicho el modelo (si no
+  comparten categoría, el producto queda fuera de las recetas), y la fecha
+  sigue pasando por `extraerFecha()`. Pedir la fecha en un campo propio
+  además evita que la expresión regular tenga que elegir entre el lote, la
+  elaboración y el vencimiento dentro de un mismo bloque de texto.
+  De paso se corrigió un caso que descartaba un producto correctamente
+  identificado cuando `textoVisible` venía vacío — justo la foto del
+  frente del envase. Cubierto por 12 chequeos nuevos entre
+  `tests/nombre.test.js` y `tests/aiProvider.test.js`.
 - **`db.js`**: `generadorConfig` renombrado a `aiProviderConfig` (STORES,
   exportAll, importAll) — es donde vive la config de motor ahora.
 - **UI (`index.html` + `main.js`)**:
