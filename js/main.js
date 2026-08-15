@@ -827,6 +827,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         detenerEscanerAuto();
         toast('Producto leído. Revisá y guardá.');
+        // El formulario ya cargado está debajo de la cámara, fuera de la
+        // pantalla. Terminado el escaneo la cámara ya no sirve de nada, así
+        // que se lleva al usuario a lo único que le queda por hacer —
+        // revisar y guardar— en vez de dejarlo scrollear a ciegas.
+        const primerCampo = find('f-name');
+        if (primerCampo) {
+          try { primerCampo.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          catch (e) { primerCampo.scrollIntoView(); }
+        }
       }
     });
   }
@@ -872,7 +881,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const iaLista = typeof AIProvider !== 'undefined' && AIProvider.disponible();
     cont.hidden = !iaLista;
-    if (estado) estado.textContent = '';
+    // El aviso de que la foto sale del dispositivo acompaña al botón desde
+    // que aparece, no recién al tocarlo: en el botón ya no entra (ahora vive
+    // superpuesto a la cámara, con lugar para dos palabras), así que el
+    // consentimiento informado se sostiene desde acá.
+    if (estado) {
+      estado.textContent = iaLista
+        ? 'Tocá "Leer con IA" y esta foto se manda a un servicio externo (Google Gemini) para intentar leerla.'
+        : '';
+    }
     if (!iaLista) return;
 
     btn.disabled = false;
