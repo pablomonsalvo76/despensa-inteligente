@@ -176,11 +176,17 @@ const AgenteHogar = (() => {
     const advertencias = [];
     let afinidad = 0;
 
-    const ingredientes = receta.ingredients.map(normalizeName);
+    /* Por ingrediente canónico, no por texto: en la despensa dice "Milanesa"
+       y en la receta dice `carne`. Comparando literales, un comensal con
+       alergia a la carne recibiría la receta. Es el mismo criterio que usan
+       el Cocinero y el validador del Generador. */
+    const canon = (n) => (typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.canonizar(n) : normalizeName(n));
+    const ingredientes = receta.ingredients.map(canon);
 
     // 1) Alergias: filtro duro e innegociable
     perfil.alergias.forEach((al) => {
-      if (ingredientes.includes(al)) bloqueos.push(`contiene ${al} (alergia declarada)`);
+      if (ingredientes.includes(canon(al))) bloqueos.push(`contiene ${al} (alergia declarada)`);
     });
 
     // 2) Condiciones médicas de exclusión total

@@ -47,7 +47,8 @@ function nuevoContexto() {
 
   ['js/db.js', 'js/recipes.js',
    'js/agents/inventario.js', 'js/agents/vencimientos.js', 'js/agents/cocinero.js',
-   'js/agents/evaluador.js', 'js/agents/aprendizaje.js', 'js/agents/hogar.js'
+   'js/agents/evaluador.js', 'js/agents/aprendizaje.js', 'js/agents/hogar.js',
+   'js/agents/compras.js'
   ].forEach((f) => vm.runInContext(leer(f), sandbox, { filename: f }));
 
   // Los agentes se declaran con `const`, así que quedan en el ámbito léxico
@@ -55,7 +56,7 @@ function nuevoContexto() {
   vm.runInContext(`globalThis.__api = {
     DB, RECIPES, normalizeName,
     AgenteInventario, AgenteVencimientos, AgenteCocinero,
-    AgenteEvaluador, AgenteAprendizaje, AgenteHogar
+    AgenteEvaluador, AgenteAprendizaje, AgenteHogar, AgenteCompras
   };`, sandbox);
 
   return sandbox.__api;
@@ -333,6 +334,134 @@ function chequear(desc, condicion, detalle) {
   chequear('las candidatas sugeridas incluyen el desglose',
     sugeridas.length > 0 && sugeridas[0].desglose && Array.isArray(sugeridas[0].desglose.porVencer),
     `desglose=${JSON.stringify(sugeridas[0] && sugeridas[0].desglose)}`);
+}
+
+/* =======================================================================
+   EL CASO REPORTADO — arroz + puré de tomate + milanesa
+   -----------------------------------------------------------------------
+   Con esos tres productos cargados, el sistema no ofrecía nada y la IA
+   "no generaba nada" sin ningún error visible. La causa: el recetario
+   piensa en 35 ingredientes genéricos (`carne`, `tomate`) y la despensa
+   real dice "Milanesa" y "Puré de tomate". Sin capa de equivalencia, la
+   app tenía una milanesa venciendo en el freezer y sostenía que no tenía
+   carne.
+   ===================================================================== */
+{
+  const api = nuevoContexto();
+  const { AgenteCocinero, DB } = api;
+
+  const DESPENSA = [
+    prod('Arroz', 300, 'cereales', 'Alacena'),
+    prod('Puré de tomate', 180, 'conservas', 'Alacena'),
+    prod('Milanesa', 2, 'carnes', 'Freezer')
+  ];
+
+  chequear('REGRESIÓN: una milanesa es carne para el recetario',
+    AgenteCocinero.canonizar('Milanesa') === 'carne', AgenteCocinero.canonizar('Milanesa'));
+  chequear('REGRESIÓN: el puré de tomate es tomate',
+    AgenteCocinero.canonizar('Puré de tomate') === 'tomate', AgenteCocinero.canonizar('Puré de tomate'));
+
+  const sug = AgenteCocinero.suggestRecipes(DESPENSA, { max: 5 });
+  chequear('REGRESIÓN: con esos 3 productos ahora sí hay recetas',
+    sug.length >= 2, `devolvió ${sug.length}`);
+  chequear('alguna receta usa efectivamente la carne',
+    sug.some((c) => c.ingredientesUsados.includes('carne')),
+    JSON.stringify(sug.map((c) => c.ingredientesUsados)));
+
+  // La milanesa vence en 2 días: tiene que ser lo prioritario.
+  const pv = AgenteCocinero.recetasParaVencer(DESPENSA);
+  chequear('la milanesa entra como producto prioritario',
+    pv.prioritarios.some((p) => p.name === 'Milanesa'),
+    JSON.stringify(pv.prioritarios.map((p) => p.name)));
+
+  /* ---- Cortes y nombres de góndola ---- */
+  const equivalencias = [
+    ['Nalga', 'carne'], ['Peceto', 'carne'], ['Bife de chorizo', 'carne'],
+    ['Carne picada', 'carne'], ['Suprema', 'pollo'], ['Pechuga', 'pollo'],
+    ['Muzzarella', 'queso'], ['Queso cremoso', 'queso'],
+    // `normalizeName` singulariza, así que la forma canónica de "fideos"
+    // es "fideo" — de los dos lados de la comparación, que es lo que importa.
+    ['Tirabuzón', 'fideo'], ['Salsa de tomate', 'tomate'],
+    ['Leche entera La Serenísima', 'leche'], ['Arroz integral', 'arroz'],
+    ['Calabaza', 'zapallo']
+  ];
+  equivalencias.forEach(([real, esperado]) => {
+    const r = AgenteCocinero.canonizar(real);
+    chequear(`"${real}" se cocina como ${esperado}`, r === esperado, `dio "${r}"`);
+  });
+
+  // Lo más específico gana: una milanesa de pollo NO es carne vacuna.
+  chequear('"milanesa de pollo" es pollo, no carne',
+    AgenteCocinero.canonizar('Milanesa de pollo') === 'pollo',
+    AgenteCocinero.canonizar('Milanesa de pollo'));
+
+  // Y una milanesa de soja no es carne de ningún tipo: mapearla bloquearía
+  // al vegetariano de la casa una receta que sí puede comer.
+  chequear('"milanesa de soja" no se convierte en carne',
+    AgenteCocinero.canonizar('Milanesa de soja') !== 'carne',
+    AgenteCocinero.canonizar('Milanesa de soja'));
+
+  // No inventa equivalencias para forzar un match.
+  chequear('un producto desconocido se deja como está',
+    AgenteCocinero.canonizar('Alfajor de maicena') === 'alfajor de maicena',
+    AgenteCocinero.canonizar('Alfajor de maicena'));
+
+  // Contiene la palabra genérica pero no es ese ingrediente: tener dulce de
+  // leche no puede hacer creer al sistema que hay leche.
+  chequear('el dulce de leche no cuenta como leche',
+    AgenteCocinero.canonizar('Dulce de leche') !== 'leche',
+    AgenteCocinero.canonizar('Dulce de leche'));
+  chequear('el pan rallado no cuenta como pan',
+    AgenteCocinero.canonizar('Pan rallado') === 'pan_rallado',
+    AgenteCocinero.canonizar('Pan rallado'));
+
+  /* ---- La traducción NO puede aflojar el filtro de alergias ----
+     Es el riesgo real de esta capa: si la alergia se declara con el nombre
+     de góndola y la receta usa el genérico, comparar literales deja pasar
+     el alérgeno. */
+  DB.set('preferences', { allergies: ['milanesa'] });
+  const conAlergia = AgenteCocinero.suggestRecipes(DESPENSA, { max: 5 });
+  chequear('declarar alergia a "milanesa" bloquea las recetas con carne',
+    conAlergia.every((c) => !c.receta.ingredients.includes('carne')),
+    JSON.stringify(conAlergia.map((c) => c.receta.name)));
+
+  DB.set('preferences', { allergies: ['carne'] });
+  const conAlergia2 = AgenteCocinero.suggestRecipes(DESPENSA, { max: 5 });
+  chequear('y declararla como "carne" también',
+    conAlergia2.every((c) => !c.receta.ingredients.includes('carne')),
+    JSON.stringify(conAlergia2.map((c) => c.receta.name)));
+  DB.set('preferences', {});
+
+  /* ---- Un producto no puede desaparecer por colapsar con otro ----
+     `inventarioNormalizado` sigue teniendo una entrada por producto: si
+     colapsara la milanesa con el bife bajo `carne`, uno de los dos se
+     borraría de "Para lo que se vence ahora" y el usuario dejaría de ver
+     un producto que sí tiene. */
+  const dosCarnes = [prod('Milanesa', 2, 'carnes', 'Freezer'), prod('Bife', 3, 'carnes', 'Heladera')];
+  const pv2 = AgenteCocinero.recetasParaVencer(dosCarnes);
+  chequear('dos cortes distintos siguen siendo dos productos',
+    pv2.prioritarios.length === 2, JSON.stringify(pv2.prioritarios.map((p) => p.name)));
+
+  /* ---- La lista de compras no puede contradecir a la de recetas ----
+     Con el mismo defecto, "Qué comprar" mandaba a comprar carne teniendo
+     la milanesa en el freezer — el producto que la pantalla de recetas
+     acababa de decir que alcanzaba. */
+  // Escenario armado para que la lista SÍ tenga algo que decir: a "Salteado
+  // de carne y verduras" (carne, zanahoria, zapallito, cebolla, aceite) le
+  // falta sólo la cebolla, y rescata la milanesa que vence en 2 días.
+  const casiCompleta = [
+    prod('Milanesa', 2, 'carnes', 'Freezer'),
+    prod('Zanahoria', 20, 'verduras', 'Heladera'),
+    prod('Zapallito', 20, 'verduras', 'Heladera'),
+    prod('Aceite', 300, 'conservas', 'Alacena')
+  ];
+  const compras = api.AgenteCompras.queComprar(casiCompleta);
+  chequear('la lista de compras propone lo que realmente falta',
+    compras.some((c) => c.ingrediente === 'cebolla'),
+    JSON.stringify(compras.map((c) => c.ingrediente)));
+  chequear('REGRESIÓN: no te manda a comprar carne teniendo una milanesa',
+    !compras.some((c) => c.ingrediente === 'carne'),
+    JSON.stringify(compras.map((c) => c.ingrediente)));
 }
 
 /* =======================================================================

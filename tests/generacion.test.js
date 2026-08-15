@@ -250,6 +250,74 @@ const DESPENSA = [
 }
 
 /* ======================================================================
+   EL VALIDADOR HABLA EL IDIOMA DE LAS RECETAS
+   ----------------------------------------------------------------------
+   Caso reportado: con arroz, puré de tomate y una milanesa cargados, la
+   IA "no generaba nada". El modelo devolvía recetas correctas y el
+   validador las tiraba con "usa ingredientes que no tenés: carne, tomate"
+   — teniendo la milanesa y el puré ahí mismo. La lista cerrada comparaba
+   nombres de producto contra nombres de receta.
+   ==================================================================== */
+{
+  const { AgenteGenerador, AgenteCocinero, DB } = nuevoContexto();
+
+  const despensa = [
+    prod('Arroz', 300, 'cereales', 'Alacena'),
+    prod('Puré de tomate', 180, 'conservas', 'Alacena'),
+    prod('Milanesa', 2, 'carnes', 'Freezer')
+  ];
+  const disp = AgenteCocinero.inventarioDisponible(despensa);
+
+  const enGenerico = {
+    name: 'Arroz con carne y tomate', ingredients: ['carne', 'arroz', 'tomate'],
+    critical: ['carne'], cookTimeMin: 30, servings: 2, cocina: 'argentina', tipo: 'principal',
+    steps: ['Descongelá la carne y dorala.', 'Sumá el arroz y el tomate, cociná 20 minutos.']
+  };
+  chequear('REGRESIÓN: una receta que dice "carne" se acepta si tenés una milanesa',
+    AgenteGenerador.validar(enGenerico, { disponibles: disp, prefs: {} }).ok,
+    AgenteGenerador.validar(enGenerico, { disponibles: disp, prefs: {} }).motivo);
+
+  const enComercial = { ...enGenerico, name: 'Milanesa con arroz al tomate',
+    ingredients: ['milanesa', 'arroz', 'pure de tomate'], critical: ['milanesa'] };
+  chequear('y la que dice "milanesa" también',
+    AgenteGenerador.validar(enComercial, { disponibles: disp, prefs: {} }).ok,
+    AgenteGenerador.validar(enComercial, { disponibles: disp, prefs: {} }).motivo);
+
+  // Sin `aceite` entre los básicos, toda receta que fría o saltee moría acá.
+  const conAceite = { ...enGenerico, name: 'Milanesa frita con arroz',
+    ingredients: ['carne', 'arroz', 'aceite'] };
+  chequear('REGRESIÓN: usar aceite no invalida la receta',
+    AgenteGenerador.validar(conAceite, { disponibles: disp, prefs: {} }).ok,
+    AgenteGenerador.validar(conAceite, { disponibles: disp, prefs: {} }).motivo);
+
+  /* ---- La lista cerrada SIGUE cerrada ----
+     Es la propiedad que sostiene todo lo demás (alergias verificables,
+     anti-inyección). Traducir no puede ser una puerta de atrás. */
+  const inventado = { ...enGenerico, ingredients: ['carne', 'arroz', 'langostinos'] };
+  chequear('un ingrediente inventado se sigue rechazando',
+    !AgenteGenerador.validar(inventado, { disponibles: disp, prefs: {} }).ok, 'lo aceptó');
+
+  const otraCarne = { ...enGenerico, ingredients: ['pollo', 'arroz', 'tomate'], critical: ['pollo'] };
+  chequear('no se acepta pollo por tener carne: la equivalencia no es entre ingredientes',
+    !AgenteGenerador.validar(otraCarne, { disponibles: disp, prefs: {} }).ok, 'lo aceptó');
+
+  /* ---- Y las alergias no pueden aflojarse por la traducción ---- */
+  chequear('alergia declarada como "milanesa" bloquea la receta con carne',
+    !AgenteGenerador.validar(enGenerico, { disponibles: disp, prefs: { allergies: ['milanesa'] } }).ok,
+    'la dejó pasar');
+  chequear('alergia declarada como "carne" bloquea la receta con milanesa',
+    !AgenteGenerador.validar(enComercial, { disponibles: disp, prefs: { allergies: ['carne'] } }).ok,
+    'la dejó pasar');
+
+  // Y la pauta vegetariana se sigue verificando sobre el ingrediente real.
+  chequear('una milanesa vacuna no pasa como vegetariana',
+    !AgenteGenerador.validar(enComercial, { disponibles: disp, prefs: { dietary: ['vegetariano'] } }).ok,
+    'la dejó pasar');
+
+  DB.set('preferences', {});
+}
+
+/* ======================================================================
    INYECCIÓN DE PROMPT
    ==================================================================== */
 {

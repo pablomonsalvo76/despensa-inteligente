@@ -37,7 +37,15 @@ const AgenteGenerador = (() => {
   // usar sin que estén cargados en el inventario. Deliberadamente cortísima:
   // cada agregado es una cosa más que el validador no puede verificar contra
   // la despensa real.
-  const BASICOS = ['sal', 'agua', 'pimienta'];
+  /* `aceite` se agregó tras un caso real: con arroz, puré de tomate y una
+     milanesa en la despensa, TODA receta razonable se rechazaba por "usa
+     ingredientes que no tenés: aceite". Nadie carga el aceite en una app de
+     vencimientos —no vence, no se compra semanalmente— pero sin él no se
+     puede freír ni saltear nada, así que el validador terminaba vetando
+     justamente las recetas correctas. La lista sigue siendo cortísima a
+     propósito: cada agregado es una cosa más que no se puede verificar
+     contra la despensa real. */
+  const BASICOS = ['sal', 'agua', 'pimienta', 'aceite'];
 
   /* Clasificación mínima para poder VERIFICAR las pautas alimentarias en vez
      de confiar en los tags que declare el modelo. Si el usuario es vegano y
@@ -93,23 +101,44 @@ const AgenteGenerador = (() => {
     const servings = Number(cruda.servings);
     if (!Number.isFinite(servings) || servings < 1 || servings > 12) return rechazo('porciones inválidas');
 
-    const ingredientes = cruda.ingredients.map((i) => normalizeName(i));
+    /* Los ingredientes se comparan por INGREDIENTE, no por nombre de
+       producto. El modelo escribe recetas, y las recetas dicen "carne"
+       aunque en el freezer diga "Milanesa". Sin esta traducción el
+       validador rechazaba las respuestas correctas —"usa ingredientes que
+       no tenés: carne, tomate"— teniendo la milanesa y el puré de tomate
+       cargados, y desde afuera se veía como que la IA no generaba nada.
+
+       La lista cerrada sigue igual de cerrada: `porIngrediente` sólo
+       contiene lo que hay en la despensa, cada cosa bajo su nombre propio y
+       su ingrediente canónico. Un ingrediente inventado no se canoniza a
+       nada de la despensa y se rechaza como antes. */
+    const canon = (i) => (typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.canonizar(i) : normalizeName(i));
+    const porIngrediente = typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.inventarioPorIngrediente(disponibles) : disponibles;
+
+    const ingredientes = cruda.ingredients.map(canon);
     if (new Set(ingredientes).size !== ingredientes.length) return rechazo('ingredientes repetidos');
 
     // --- LISTA CERRADA: sólo lo que hay en la despensa, más los básicos ---
     // Es lo que hace verificable todo lo que sigue: no se puede afirmar que
     // una receta está libre de un alérgeno si contiene algo no identificado.
-    const permitidos = new Set([...disponibles.keys(), ...BASICOS]);
+    const permitidos = new Set([...porIngrediente.keys(), ...BASICOS]);
     const invasores = ingredientes.filter((i) => !permitidos.has(i));
     if (invasores.length) return rechazo(`usa ingredientes que no tenés: ${invasores.join(', ')}`);
 
     // --- Críticos: deben existir en la despensa (nunca sólo en los básicos) ---
-    const critical = Array.isArray(cruda.critical) ? cruda.critical.map(normalizeName) : [];
+    const critical = Array.isArray(cruda.critical) ? cruda.critical.map(canon) : [];
     if (critical.some((c) => !ingredientes.includes(c))) return rechazo('crítico ausente de la receta');
-    if (critical.some((c) => !disponibles.has(c))) return rechazo('crítico que no está en la despensa');
+    if (critical.some((c) => !porIngrediente.has(c))) return rechazo('crítico que no está en la despensa');
 
-    // --- ALERGIAS: filtro duro e innegociable (Sección 7) ---
-    const alergias = (prefs.allergies || []).map(normalizeName).filter(Boolean);
+    /* --- ALERGIAS: filtro duro e innegociable (Sección 7) ---
+       Las alergias se canonizan igual que los ingredientes, o la traducción
+       de arriba abriría un agujero: quien declaró "milanesa" como alergia
+       recibiría una receta con `carne` porque los dos textos no coinciden.
+       Canonizar acá sólo puede bloquear de más, nunca de menos, que es el
+       único lado hacia el que un filtro de alergias puede equivocarse. */
+    const alergias = (prefs.allergies || []).map(canon).filter(Boolean);
     const alergeno = ingredientes.find((i) => alergias.includes(i));
     if (alergeno) return rechazo(`contiene ${alergeno}, declarado como alergia`);
 
@@ -223,6 +252,8 @@ const AgenteGenerador = (() => {
       '',
       'Respondé SÓLO con JSON válido, sin texto alrededor, con esta forma:',
       '{"name":"","ingredients":[],"critical":[],"steps":["",""],"cookTimeMin":25,"servings":2,"cocina":"","tipo":""}',
+      'Podés nombrar cada ingrediente como quieras (por su nombre de la lista',
+      'o por el genérico: "milanesa" o "carne" son lo mismo).',
       'No inventes ingredientes que no estén en la lista.'
     ].filter(Boolean).join('\n');
   }
@@ -299,8 +330,12 @@ const AgenteGenerador = (() => {
       const v = validar(cruda, { disponibles, prefs, perfilHogar });
       if (!v.ok) { rechazadas.push({ motivo: v.motivo, nombre: cruda.name }); continue; }
 
-      const ingredientesReceta = new Set(v.receta.ingredients);
-      const faltantes = nombresObligatorios.filter((n) => !ingredientesReceta.has(normalizeName(n)));
+      // Por ingrediente, igual que el validador: pedir "Milanesa" y recibir
+      // una receta con `carne` es cobertura cumplida, no un olvido.
+      const canonizarNombre = (n) => (typeof AgenteCocinero !== 'undefined'
+        ? AgenteCocinero.canonizar(n) : normalizeName(n));
+      const ingredientesReceta = new Set(v.receta.ingredients.map(canonizarNombre));
+      const faltantes = nombresObligatorios.filter((n) => !ingredientesReceta.has(canonizarNombre(n)));
       if (faltantes.length) {
         rechazadas.push({ motivo: `no cubrió: ${faltantes.join(', ')}`, nombre: v.receta.name });
         continue;

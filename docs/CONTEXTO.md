@@ -112,6 +112,12 @@ llamadas rotas (todo `AgenteX.metodo()` usado coincide con lo expuesto).
    cocinero y la lista de compras pueden operar sobre inventarios
    "disponibles" distintos al mismo tiempo. Se agrava con volumen tipo
    hotel/restaurante (muchos productos con nombres repetidos por lote).
+   → **Corregido el 2026-08-15**: `compras.js` reutiliza
+   `AgenteCocinero.inventarioDisponible` + `inventarioPorIngrediente`. Se
+   hizo al arreglar el caso "milanesa" (ver más abajo), donde el defecto
+   dejó de ser teórico: la lista de compras mandaba a comprar carne
+   teniendo una milanesa en el freezer, contradiciendo a la pantalla de
+   recetas que acababa de decir que alcanzaba.
 
 2. **`evaluador.js` documenta un desenlace `'ignorado'`
    ([:59](../js/agents/evaluador.js#L59)) que nunca se implementó.** Hoy
@@ -543,3 +549,80 @@ receta, el código dice la verdad sobre la despensa.
 
 19 chequeos nuevos entre `tests/recomendacion.test.js` y
 `tests/generacion.test.js` (266 en total, 8 suites). sw `v41`.
+
+### "Tengo una milanesa pero no tengo carne" — 2026-08-15
+
+**Síntoma reportado.** Con tres productos cargados (arroz, puré de tomate,
+milanesa) el Cocinero casi no ofrecía nada y la IA "no generaba nada", sin
+ningún error visible en pantalla.
+
+**Reproducido antes de tocar código** (script en scratchpad, no versionado):
+
+```
+claves del inventario:  [ 'arroz', 'pure de tomate', 'milanesa' ]
+recetas del catálogo:   [ 'Arroz con verduras salteadas' ]   <- 1 de 27
+combo para lo que vence: null
+respuestas del modelo:
+  "Milanesa a la napolitana"  -> RECHAZADA: usa ingredientes que no tenés: aceite
+  "Arroz con carne y tomate"  -> RECHAZADA: usa ingredientes que no tenés: carne, tomate
+```
+
+**Tres causas independientes, todas reales:**
+
+1. **No había capa de equivalencia entre el producto y el ingrediente.** El
+   recetario piensa en 35 genéricos (`carne`, `tomate`, `fideos`); la
+   despensa real dice "Milanesa", "Puré de tomate", "Tirabuzón". La app
+   tenía una milanesa venciendo en el freezer y sostenía que no tenía
+   carne. Rompía las dos capas a la vez: el catálogo no matcheaba, y el
+   validador del Generador rechazaba la respuesta del modelo justo cuando
+   éste escribía "carne", que es como se escriben las recetas.
+2. **`aceite` no estaba entre los básicos.** Nadie carga el aceite en una
+   app de vencimientos —no vence, no se compra semanalmente— pero sin él no
+   se fríe ni saltea nada, así que el validador vetaba justamente las
+   recetas correctas.
+3. **La lista de compras tenía el mismo defecto** y mandaba a comprar carne
+   teniendo la milanesa.
+
+**Solución: `AgenteCocinero.canonizar(nombre)`.** Traduce el nombre real al
+ingrediente que el recetario entiende. La lista de ingredientes conocidos se
+DERIVA de `RECIPES`, así que no queda desincronizada si se agregan recetas.
+Orden de resolución, de más específico a menos:
+
+1. coincidencia exacta;
+2. excepciones (`dulce de leche` NO es leche — tenerlo hacía creer al
+   sistema que había leche y ofrecía recetas imposibles);
+3. alias de varias palabras (`bife de chorizo` → carne, y no `chorizo`,
+   que es un ingrediente real del recetario — lo encontró un test);
+4. la palabra genérica dentro del nombre comercial (`puré de tomate` →
+   tomate, `milanesa de pollo` → **pollo**, no carne);
+5. alias sueltos (`milanesa`, `nalga`, `muzzarella`, `tirabuzón`…).
+
+Si no reconoce nada devuelve el nombre tal cual: nunca inventa una
+equivalencia para forzar un match.
+
+**Dos decisiones de diseño que importan:**
+
+- **`inventarioPorIngrediente` es un índice SEPARADO de
+  `inventarioNormalizado`.** Son dos preguntas distintas y mezclarlas rompe
+  una: "qué productos tengo" se recorre por valores y cada producto tiene
+  que aparecer una vez; "¿tengo carne?" se consulta por clave y un producto
+  puede responder a varios nombres. Colapsando todo en un solo mapa, tener
+  milanesa y bife hubiera hecho desaparecer uno de los dos de "Para lo que
+  se vence ahora".
+- **Un producto "de soja" nunca se resuelve a carne**, aunque se llame
+  milanesa: mapearlo le bloquearía al vegetariano de la casa una receta que
+  sí puede comer.
+
+**Riesgo que introduce la traducción, y cómo se cierra.** Comparar por
+ingrediente canónico podía abrir un agujero en el filtro de alergias: quien
+declaró "milanesa" recibiría una receta con `carne` porque los textos no
+coinciden. Se canonizan también las alergias, en los tres lugares donde se
+verifican (`generador.validar`, `cocinero.cumpleRestricciones`,
+`hogar.evaluarReceta`). Canonizar sólo puede bloquear de más, nunca de
+menos, que es el único lado hacia el que un filtro de alergias puede
+equivocarse. La lista cerrada sigue cerrada: un ingrediente inventado no se
+canoniza a nada de la despensa y se rechaza igual que antes.
+
+28 chequeos nuevos, varios adversarios (ingrediente inventado, alergia por
+nombre comercial, milanesa de soja, no aceptar pollo por tener carne). 302
+en total, 8 suites. sw `v42`.

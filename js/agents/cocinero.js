@@ -19,6 +19,126 @@
  */
 
 const AgenteCocinero = (() => {
+  /* ---- Qué ES cada producto para el recetario ---------------------------
+     El motor de recetas piensa en 35 ingredientes genéricos: carne, tomate,
+     fideos, queso. La despensa real está llena de nombres de góndola:
+     "milanesa", "puré de tomate", "tirabuzón", "muzzarella". Sin una capa
+     que los una, el sistema tiene una milanesa venciendo en el freezer y
+     sostiene con toda seriedad que no tiene carne.
+
+     No es cosmético, rompe las DOS capas del Cocinero a la vez:
+       · el recetario fijo no matchea ninguna receta, porque busca `carne`;
+       · y el validador del Generador —que sólo acepta ingredientes de la
+         despensa— rechaza la receta del modelo justo cuando éste escribe
+         "carne", que es como se escriben las recetas.
+     El resultado que se veía era "no genera nada" sin ningún error visible.
+
+     La lista de ingredientes conocidos se DERIVA de `RECIPES` en vez de
+     escribirse a mano: si mañana se agrega una receta con un ingrediente
+     nuevo, esta capa lo reconoce sola y no queda desincronizada.
+     -------------------------------------------------------------------- */
+  const INGREDIENTES_RECETARIO = new Set(
+    RECIPES.reduce((acc, r) => acc.concat(r.ingredients.map(normalizeName)), [])
+  );
+
+  /* Nombres de góndola que NO contienen la palabra genérica adentro. Los que
+     sí la contienen —"puré de tomate", "queso cremoso", "arroz integral",
+     "leche entera"— no necesitan entrada acá: los resuelve la búsqueda por
+     palabra de `canonizar`, que es lo que mantiene esta tabla corta. */
+  const SINONIMOS = {
+    // "bife de chorizo" está acá y no por casualidad: contiene la palabra
+    // `chorizo`, que ES un ingrediente del recetario, así que sin la entrada
+    // explícita un bife terminaba cocinándose como embutido. Los alias de
+    // varias palabras se prueban primero justamente por estos casos.
+    carne: ['bife de chorizo', 'milanesa', 'nalga', 'peceto', 'bife', 'cuadril',
+            'lomo', 'vacio', 'asado', 'matambre', 'osobuco', 'roast beef',
+            'falda', 'entraña', 'churrasco', 'hamburguesa', 'bondiola',
+            'cerdo', 'costilla'],
+    pollo: ['suprema', 'pechuga', 'muslo', 'alita'],
+    queso: ['muzzarella', 'mozzarella', 'cremoso', 'port salut', 'parmesano',
+            'tybo', 'sardo', 'provolone'],
+    fideos: ['tirabuzon', 'mostachol', 'spaghetti', 'espagueti', 'tallarin',
+             'penne', 'codito', 'municion', 'macarron', 'farfalle', 'pasta'],
+    zapallo: ['calabaza', 'anco', 'cabutia'],
+    pan_rallado: ['pan rallado', 'rebozador']
+  };
+
+  /* Nombres que contienen una palabra genérica pero NO son ese ingrediente.
+     El dulce de leche es el caso claro: sin esta excepción, tenerlo en la
+     alacena hacía creer al sistema que había leche, y ofrecía recetas
+     imposibles. Se dejan tal cual y se cocinan sólo si alguna receta los
+     nombra a ellos. */
+  const NO_ES_EL_GENERICO = ['dulce de leche', 'leche de coco', 'agua de coco'];
+
+  /* Un producto "de soja" o "vegetal" no es carne por más que se llame
+     milanesa. La app guarda pautas alimentarias de todos los comensales:
+     mapearlo a `carne` le bloquearía al vegetariano de la casa una receta
+     que sí puede comer, y eso es un error con consecuencias. */
+  const NO_ES_ANIMAL = /soja|vegetal|vegetariana|vegana|seitan|tofu|legumbre/;
+  const DE_ORIGEN_ANIMAL = new Set(['carne', 'pollo']);
+
+  /**
+   * Traduce el nombre real de un producto al ingrediente que el recetario
+   * entiende. Si no reconoce nada, devuelve el nombre normalizado tal cual:
+   * nunca inventa una equivalencia para forzar un match.
+   */
+  function canonizar(nombre) {
+    const n = normalizeName(nombre);
+    if (!n || INGREDIENTES_RECETARIO.has(n)) return n;
+    if (NO_ES_EL_GENERICO.some((e) => n.includes(e))) return n;
+
+    // Un producto de soja o vegetal nunca se resuelve a un ingrediente
+    // animal, ni siquiera si se llama "milanesa".
+    const vegetal = NO_ES_ANIMAL.test(n);
+    const aplicables = Object.keys(SINONIMOS)
+      .filter((c) => !(vegetal && DE_ORIGEN_ANIMAL.has(c)));
+    const buscar = (predicado) => aplicables
+      .find((c) => SINONIMOS[c].some((alias) => predicado(alias)));
+
+    // 1) Alias de varias palabras. Van primero porque son los más
+    //    específicos: "bife de chorizo" tiene que ganarle a `chorizo`.
+    const compuesto = buscar((alias) => alias.includes(' ') && n.includes(alias));
+    if (compuesto) return normalizeName(compuesto);
+
+    // 2) La palabra genérica adentro del nombre comercial: "puré de tomate"
+    //    -> tomate. Antes de los alias sueltos porque también es más
+    //    específica: una "milanesa de pollo" es pollo, no carne.
+    const directo = n.split(/[^a-z0-9]+/).find((p) => p && INGREDIENTES_RECETARIO.has(p));
+    if (directo) return directo;
+
+    // 3) Nombres de góndola que no contienen la palabra genérica en ningún lado.
+    const suelto = buscar((alias) => n.includes(alias));
+    return suelto ? normalizeName(suelto) : n;
+  }
+
+  /* ---- Índice para preguntar "¿tengo tal ingrediente?" ------------------
+     Deliberadamente SEPARADO de `inventarioNormalizado`. Son dos preguntas
+     distintas y mezclarlas rompe una de las dos:
+
+       · `inventarioNormalizado` responde "qué productos tengo" — se recorre
+         por valores, y ahí cada producto tiene que aparecer UNA vez. Si se
+         colapsaran acá la milanesa y el bife bajo la clave `carne`, uno de
+         los dos desaparecería de "Para lo que se vence ahora" y el usuario
+         dejaría de ver un producto que sí tiene.
+       · este índice responde "¿tengo carne?" — se consulta por clave, y ahí
+         un mismo producto puede (y debe) responder a varios nombres.
+
+     Cada producto entra por su ingrediente canónico Y por su nombre propio:
+     el modelo puede escribir "carne" o "milanesa" y las dos son correctas.
+     -------------------------------------------------------------------- */
+  function inventarioPorIngrediente(invMap) {
+    const porIng = new Map();
+    invMap.forEach((p) => {
+      const canonico = canonizar(p.name);
+      const previo = porIng.get(canonico);
+      if (!previo || p.daysRemaining < previo.daysRemaining) porIng.set(canonico, p);
+
+      const propio = normalizeName(p.name);
+      if (propio !== canonico && !porIng.has(propio)) porIng.set(propio, p);
+    });
+    return porIng;
+  }
+
   function inventarioNormalizado(enriquecidos) {
     // Mapa de ingredientes DISPONIBLES para cocinar.
     //
@@ -40,9 +160,11 @@ const AgenteCocinero = (() => {
   }
 
   function cumpleRestricciones(receta, prefs) {
-    // Filtro duro: alergias y pautas alimentarias del titular (Sección 7)
-    const alergias = (prefs.allergies || []).map(normalizeName);
-    const tieneAlergeno = receta.ingredients.some((ing) => alergias.includes(normalizeName(ing)));
+    // Filtro duro: alergias y pautas alimentarias del titular (Sección 7).
+    // Por ingrediente canónico: declarar "milanesa" como alergia tiene que
+    // bloquear las recetas con `carne`, aunque el texto no coincida.
+    const alergias = (prefs.allergies || []).map(canonizar);
+    const tieneAlergeno = receta.ingredients.some((ing) => alergias.includes(canonizar(ing)));
     if (tieneAlergeno) return false;
 
     const dietas = prefs.dietary || [];
@@ -52,10 +174,10 @@ const AgenteCocinero = (() => {
     return true;
   }
 
-  function tieneCriticosDisponibles(receta, invMap) {
+  function tieneCriticosDisponibles(receta, ingMap) {
     // "No se sugieren recetas a las que les falten ingredientes críticos
     // no sustituibles" (Sección 7)
-    return receta.critical.every((ing) => invMap.has(normalizeName(ing)));
+    return receta.critical.every((ing) => ingMap.has(canonizar(ing)));
   }
 
   // Peso de urgencia continuo: cuanto menos días quedan, más urge rescatarlo.
@@ -115,13 +237,12 @@ const AgenteCocinero = (() => {
     return Math.max(-MAX_AFINIDAD, Math.min(MAX_AFINIDAD, suma));
   }
 
-  function score(receta, invMap, prefs, productoPrioritario) {
+  function score(receta, ingMap, prefs, productoPrioritario) {
     let coverage = 0;
     let urgencyScore = 0;
 
     receta.ingredients.forEach((ing) => {
-      const norm = normalizeName(ing);
-      const producto = invMap.get(norm);
+      const producto = ingMap.get(canonizar(ing));
       if (producto) {
         coverage += 1;
         urgencyScore += pesoUrgencia(producto);
@@ -131,7 +252,7 @@ const AgenteCocinero = (() => {
     const coverageRatio = coverage / receta.ingredients.length;
 
     const rescataPrioritario = productoPrioritario &&
-      receta.ingredients.some((ing) => normalizeName(ing) === normalizeName(productoPrioritario.name));
+      receta.ingredients.some((ing) => canonizar(ing) === canonizar(productoPrioritario.name));
     const bonusPrioritario = rescataPrioritario ? BONUS_PRIORITARIO : 0;
 
     // Ajuste por aprendizaje: penaliza ingredientes repetidamente rechazados
@@ -158,19 +279,25 @@ const AgenteCocinero = (() => {
      modelo se le pide la receta, no el estado de la despensa — pedirle un
      dato que uno tiene es la forma más fácil de que lo devuelva mal.
      -------------------------------------------------------------------- */
-  const BASICOS_COCINA = new Set(['sal', 'agua', 'pimienta']);
+  // Espejo de `AgenteGenerador.BASICOS`: lo que se asume presente en
+  // cualquier cocina y por lo tanto no se reporta como "te falta".
+  const BASICOS_COCINA = new Set(['sal', 'agua', 'pimienta', 'aceite']);
   const ARTICULO = { Heladera: 'la heladera', Freezer: 'el freezer', Alacena: 'la alacena' };
 
   function desglosarIngredientes(receta, invMap, prioritarios = []) {
-    const urgentes = new Set((prioritarios || []).map((p) => normalizeName(p.name)));
+    // Se resuelve por ingrediente, no por nombre de producto: una receta pide
+    // "carne" y lo que hay en el freezer se llama "Milanesa". La operación es
+    // idempotente, así que da igual si el llamador ya pasó un índice.
+    const porIngrediente = inventarioPorIngrediente(invMap);
+    const urgentes = new Set((prioritarios || []).map((p) => canonizar(p.name)));
     const porVencer = [];
     const complementos = [];
     const basicos = [];
     const faltantes = [];
 
     (receta.ingredients || []).forEach((ing) => {
-      const norm = normalizeName(ing);
-      const producto = invMap.get(norm);
+      const norm = canonizar(ing);
+      const producto = porIngrediente.get(norm) || porIngrediente.get(normalizeName(ing));
       if (!producto) {
         (BASICOS_COCINA.has(norm) ? basicos : faltantes).push(ing);
         return;
@@ -237,15 +364,18 @@ const AgenteCocinero = (() => {
      -------------------------------------------------------------------- */
   function evaluarCandidatas(invMap, prefs, perfilHogar, perfilEstilo, productoPrioritario) {
     const descartadas = recetasDescartadas();
+    // Índice por ingrediente: acá se pregunta "¿tengo carne?", no "¿tengo un
+    // producto llamado carne?". Se arma una sola vez para las 27 recetas.
+    const ingMap = inventarioPorIngrediente(invMap);
 
     return RECIPES
       .filter((r) => !descartadas.has(r.id))
       .filter((r) => cumpleRestricciones(r, prefs))
-      .filter((r) => tieneCriticosDisponibles(r, invMap))
+      .filter((r) => tieneCriticosDisponibles(r, ingMap))
       .map((r) => {
-        const usados = r.ingredients.filter((ing) => invMap.has(normalizeName(ing)));
+        const usados = r.ingredients.filter((ing) => ingMap.has(canonizar(ing)));
         const rescataPrioritario = !!productoPrioritario &&
-          r.ingredients.some((ing) => normalizeName(ing) === normalizeName(productoPrioritario.name));
+          r.ingredients.some((ing) => canonizar(ing) === canonizar(productoPrioritario.name));
 
         // Veredicto del hogar: bloqueos (alergia / condición médica),
         // advertencias (sodio alto, no apto para el vegetariano de la casa)
@@ -258,24 +388,24 @@ const AgenteCocinero = (() => {
 
         return {
           receta: r,
-          puntaje: score(r, invMap, prefs, productoPrioritario) + hogar.afinidad + afinEstilo,
+          puntaje: score(r, ingMap, prefs, productoPrioritario) + hogar.afinidad + afinEstilo,
           afinidadEstilo: afinEstilo,
           rescataPrioritario,
           productoPrioritario: rescataPrioritario ? productoPrioritario : null,
           ingredientesUsados: usados,
-          faltantes: r.ingredients.filter((ing) => !invMap.has(normalizeName(ing))),
+          faltantes: r.ingredients.filter((ing) => !ingMap.has(canonizar(ing))),
           // Qué se rescata, qué se complementa con lo que ya hay y dónde
           // está cada cosa. Va en la candidata para que la UI no tenga que
           // reconstruir el inventario por su cuenta.
-          desglose: desglosarIngredientes(r, invMap, productoPrioritario ? [productoPrioritario] : []),
+          desglose: desglosarIngredientes(r, ingMap, productoPrioritario ? [productoPrioritario] : []),
           hogar,
           // Ingredientes que la receta rescata, ordenados por urgencia real
           ingredientesUrgentes: usados
             .filter((ing) => {
-              const p = invMap.get(normalizeName(ing));
+              const p = ingMap.get(canonizar(ing));
               return p && (p.urgencia === 'rojo' || p.urgencia === 'amarillo');
             })
-            .sort((a, b) => invMap.get(normalizeName(a)).daysRemaining - invMap.get(normalizeName(b)).daysRemaining)
+            .sort((a, b) => ingMap.get(canonizar(a)).daysRemaining - ingMap.get(canonizar(b)).daysRemaining)
         };
       })
       .filter((c) => c.ingredientesUsados.length > 0)
@@ -315,7 +445,7 @@ const AgenteCocinero = (() => {
   // Cuántos de los productos prioritarios rescata una receta.
   function contarRescatados(receta, prioritarios) {
     return prioritarios.filter((p) =>
-      receta.ingredients.some((ing) => normalizeName(ing) === normalizeName(p.name))
+      receta.ingredients.some((ing) => canonizar(ing) === canonizar(p.name))
     ).length;
   }
 
@@ -356,7 +486,7 @@ const AgenteCocinero = (() => {
     const individuales = prioritarios
       .map((p) => {
         const mejor = candidatas
-          .filter((c) => c.receta.ingredients.some((ing) => normalizeName(ing) === normalizeName(p.name)))
+          .filter((c) => c.receta.ingredients.some((ing) => canonizar(ing) === canonizar(p.name)))
           .sort((a, b) => b.puntaje - a.puntaje)[0];
         return mejor ? { producto: p, ...mejor } : null;
       })
@@ -422,16 +552,16 @@ const AgenteCocinero = (() => {
     const original = RECIPES.find((r) => r.id === recipeId);
     if (!original) return [];
 
-    const invMap = inventarioNormalizado(enriquecidos);
+    const ingMap = inventarioPorIngrediente(inventarioNormalizado(enriquecidos));
     const criticosDisponibles = original.critical
-      .map(normalizeName)
-      .filter((n) => invMap.has(n));
+      .map(canonizar)
+      .filter((n) => ingMap.has(n));
     if (!criticosDisponibles.length) return [];
 
     return suggestRecipes(enriquecidos, { max: RECIPES.length })
       .filter((c) => c.receta.id !== recipeId)
       .filter((c) => c.receta.ingredients
-        .some((ing) => criticosDisponibles.includes(normalizeName(ing))))
+        .some((ing) => criticosDisponibles.includes(canonizar(ing))))
       .slice(0, max);
   }
 
@@ -449,6 +579,7 @@ const AgenteCocinero = (() => {
     suggestRecipes, recetasParaVencer, descartarReceta, alternativasA,
     restaurarDescartadas, listarDescartadas,
     desglosarIngredientes, fraseDisponibilidad,
+    canonizar, inventarioPorIngrediente,
     afinidadEstilo, BONUS_PRIORITARIO, MAX_AFINIDAD,
     // Lo usa el Agente Generador: la exclusión de vencidos es la regla de
     // seguridad más importante y tiene que vivir en un solo lugar.

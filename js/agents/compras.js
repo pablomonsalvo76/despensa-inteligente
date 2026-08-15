@@ -21,10 +21,18 @@ const AgenteCompras = (() => {
      que le faltan 4.
      ---------------------------------------------------------------------- */
   function queComprar(enriquecidos) {
-    const invMap = new Map();
-    enriquecidos
-      .filter((p) => p.urgencia !== 'vencido' && p.daysRemaining > 0)
-      .forEach((p) => invMap.set(normalizeName(p.name), p));
+    /* Índice por INGREDIENTE, no por nombre de producto. Comparando texto,
+       esta lista mandaba a comprar "carne" teniendo una milanesa en el
+       freezer — y el mismo producto que la pantalla de recetas acababa de
+       decir que alcanzaba. Se reutiliza el índice del Cocinero para que las
+       dos pantallas no puedan volver a contradecirse. */
+    const invMap = typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.inventarioPorIngrediente(AgenteCocinero.inventarioDisponible(enriquecidos))
+      : new Map(enriquecidos
+          .filter((p) => p.urgencia !== 'vencido' && p.daysRemaining > 0)
+          .map((p) => [normalizeName(p.name), p]));
+    const clave = (ing) => (typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.canonizar(ing) : normalizeName(ing));
 
     const enRiesgo = enriquecidos.filter((p) =>
       (p.urgencia === 'rojo' || p.urgencia === 'amarillo') && p.daysRemaining > 0);
@@ -48,14 +56,14 @@ const AgenteCompras = (() => {
         if (!receta.tags.includes(d)) return;
       }
 
-      const faltantes = receta.ingredients.filter((ing) => !invMap.has(normalizeName(ing)));
+      const faltantes = receta.ingredients.filter((ing) => !invMap.has(clave(ing)));
       // Si falta demasiado, comprar para esa receta ya no es "aprovechar lo
       // que tengo": es hacer las compras del mes. Se acota a 2 faltantes.
       if (faltantes.length === 0 || faltantes.length > 2) return;
 
       // ¿Esta receta rescata algo que está por vencer?
       const rescata = receta.ingredients
-        .map((ing) => invMap.get(normalizeName(ing)))
+        .map((ing) => invMap.get(clave(ing)))
         .filter((p) => p && (p.urgencia === 'rojo' || p.urgencia === 'amarillo'));
       if (rescata.length === 0) return;
 
