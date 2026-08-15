@@ -139,6 +139,74 @@ const AgenteCocinero = (() => {
     return porIng;
   }
 
+  /* ---- Resolver un ingrediente ESCRITO contra la despensa ---------------
+     Lo escribe el recetario o lo escribe el modelo, y en los dos casos el
+     texto no tiene por qué coincidir carácter por carácter con el nombre
+     que el usuario tiene guardado. Tres formas, de más estricta a menos:
+
+       1. la clave exacta (nombre propio o ingrediente canónico);
+
+       2. la clave con la puntuación aplanada. El modelo sólo puede copiar
+          lo que le mostramos, y el prompt SANEA los nombres antes de
+          mostrarlos: con "Mayonesa Hellmann's Clásica" cargada, el
+          apóstrofo desaparecía del prompt, el modelo devolvía "mayonesa
+          hellmanns clasica" y el validador lo rechazaba por no coincidir
+          con su propia clave. Rechazaba la respuesta correcta a una
+          pregunta que él mismo había hecho mal;
+
+       3. prefijo por PALABRAS COMPLETAS: "mayonesa" resuelve a "Mayonesa
+          Hellmanns Clásica". Es lo natural —una receta dice "mayonesa", no
+          la marca— y se apoya en que el nombre se arma con el tipo
+          adelante. Por palabras y sólo como prefijo, nunca por contención:
+          así "sal" no puede resolver a "salchicha", ni "leche" a "dulce de
+          leche".
+
+     Nada de esto afloja la lista cerrada: se resuelve SIEMPRE contra un
+     producto que está en la despensa. Un ingrediente inventado no resuelve
+     a nada y se rechaza igual que antes.
+     -------------------------------------------------------------------- */
+  /* El apóstrofo se BORRA en vez de separar: el prompt lo elimina al sanear,
+     así que el modelo escribe "hellmanns" donde la despensa dice
+     "hellmann's". Separando, quedaban 4 palabras contra 3 y no emparejaban
+     nunca. El resto de la puntuación sí separa —"port-salut" y "port salut"
+     tienen que dar lo mismo de los dos lados. */
+  const aplanar = (t) => normalizeName(t)
+    .replace(/['’`]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  function buscarEnDespensa(ingrediente, porIngrediente) {
+    const directo = porIngrediente.get(canonizar(ingrediente))
+      || porIngrediente.get(normalizeName(ingrediente));
+    if (directo) return directo;
+
+    const palabras = aplanar(ingrediente).split(' ').filter(Boolean);
+    if (!palabras.length) return null;
+
+    for (const [clave, producto] of porIngrediente) {
+      const candidato = aplanar(clave).split(' ');
+      if (candidato.length < palabras.length) continue;
+      if (palabras.every((p, i) => p === candidato[i])) return producto;
+    }
+    return null;
+  }
+
+  /* ¿Estos dos textos nombran el mismo alimento? Se usa para las ALERGIAS,
+     donde el riesgo corre al revés: si un ingrediente se puede escribir de
+     varias formas, la alergia declarada también, y comparar literales deja
+     pasar el alérgeno. Quien declaró "Mayonesa Hellmanns" no puede recibir
+     una receta con "mayonesa". Prefijo por palabras en CUALQUIER dirección:
+     bloquea de más, nunca de menos. */
+  function esMismoAlimento(a, b) {
+    if (canonizar(a) === canonizar(b)) return true;
+    const pa = aplanar(a).split(' ').filter(Boolean);
+    const pb = aplanar(b).split(' ').filter(Boolean);
+    if (!pa.length || !pb.length) return false;
+    const corto = pa.length <= pb.length ? pa : pb;
+    const largo = corto === pa ? pb : pa;
+    return corto.every((p, i) => p === largo[i]);
+  }
+
   function inventarioNormalizado(enriquecidos) {
     // Mapa de ingredientes DISPONIBLES para cocinar.
     //
@@ -163,8 +231,9 @@ const AgenteCocinero = (() => {
     // Filtro duro: alergias y pautas alimentarias del titular (Sección 7).
     // Por ingrediente canónico: declarar "milanesa" como alergia tiene que
     // bloquear las recetas con `carne`, aunque el texto no coincida.
-    const alergias = (prefs.allergies || []).map(canonizar);
-    const tieneAlergeno = receta.ingredients.some((ing) => alergias.includes(canonizar(ing)));
+    const alergias = (prefs.allergies || []).filter(Boolean);
+    const tieneAlergeno = receta.ingredients.some((ing) =>
+      alergias.some((al) => esMismoAlimento(al, ing)));
     if (tieneAlergeno) return false;
 
     const dietas = prefs.dietary || [];
@@ -297,7 +366,7 @@ const AgenteCocinero = (() => {
 
     (receta.ingredients || []).forEach((ing) => {
       const norm = canonizar(ing);
-      const producto = porIngrediente.get(norm) || porIngrediente.get(normalizeName(ing));
+      const producto = buscarEnDespensa(ing, porIngrediente);
       if (!producto) {
         (BASICOS_COCINA.has(norm) ? basicos : faltantes).push(ing);
         return;
@@ -579,7 +648,7 @@ const AgenteCocinero = (() => {
     suggestRecipes, recetasParaVencer, descartarReceta, alternativasA,
     restaurarDescartadas, listarDescartadas,
     desglosarIngredientes, fraseDisponibilidad,
-    canonizar, inventarioPorIngrediente,
+    canonizar, inventarioPorIngrediente, buscarEnDespensa, esMismoAlimento,
     afinidadEstilo, BONUS_PRIORITARIO, MAX_AFINIDAD,
     // Lo usa el Agente Generador: la exclusión de vencidos es la regla de
     // seguridad más importante y tiene que vivir en un solo lugar.

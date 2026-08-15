@@ -318,6 +318,84 @@ const DESPENSA = [
 }
 
 /* ======================================================================
+   EL CASO "MAYONESA HELLMANN'S" — el validador contra su propio prompt
+   ----------------------------------------------------------------------
+   Reportado en pantalla: "No salió ninguna receta que pase los controles.
+   Motivo: usa ingredientes que no tenés: mayonesa hellmanns clasica" —
+   teniendo la mayonesa cargada.
+
+   El prompt SANEA los nombres antes de mostrárselos al modelo (defensa
+   contra inyección), pero la lista cerrada se armaba con el nombre sin
+   sanear. El modelo sólo puede copiar lo que ve, así que devolvía la
+   versión saneada y no coincidía. El validador rechazaba la respuesta
+   correcta a una pregunta que él mismo había hecho mal.
+   ==================================================================== */
+{
+  const { AgenteGenerador, AgenteCocinero } = nuevoContexto();
+
+  const despensa = [prod("Mayonesa Hellmann's Clásica", 3, 'conservas'), prod('Papa', 20, 'verduras')];
+  const disp = AgenteCocinero.inventarioDisponible(despensa);
+
+  // Lo que el modelo ve en el prompt es lo único que puede copiar.
+  const prompt = AgenteGenerador.armarPrompt(disp, null, {});
+  chequear('el apóstrofo no llega al prompt (se sanea)',
+    !prompt.includes("Hellmann's"), prompt);
+
+  const base = { name: 'Ensalada de papa', critical: [], cookTimeMin: 15, servings: 2,
+    cocina: 'argentina', tipo: 'guarnicion',
+    steps: ['Hervi la papa 15 minutos.', 'Mezclá con la mayonesa y enfriá.'] };
+
+  const comoLoDevuelve = { ...base, ingredients: ['mayonesa hellmanns clasica', 'papa'] };
+  chequear('REGRESIÓN: el nombre saneado que devuelve el modelo se acepta',
+    AgenteGenerador.validar(comoLoDevuelve, { disponibles: disp, prefs: {} }).ok,
+    AgenteGenerador.validar(comoLoDevuelve, { disponibles: disp, prefs: {} }).motivo);
+
+  // Y lo natural: una receta dice "mayonesa", no la marca.
+  const generico = { ...base, ingredients: ['mayonesa', 'papa'], critical: ['mayonesa'] };
+  chequear('REGRESIÓN: el genérico "mayonesa" resuelve a la mayonesa cargada',
+    AgenteGenerador.validar(generico, { disponibles: disp, prefs: {} }).ok,
+    AgenteGenerador.validar(generico, { disponibles: disp, prefs: {} }).motivo);
+
+  /* ---- Y lo que NO puede pasar ----
+     Emparejar por prefijo de palabras no puede convertirse en una puerta
+     de atrás para meter algo que el usuario no tiene. */
+  const inventado = { ...base, ingredients: ['ketchup', 'papa'] };
+  chequear('un condimento que no tenés se sigue rechazando',
+    !AgenteGenerador.validar(inventado, { disponibles: disp, prefs: {} }).ok, 'lo aceptó');
+
+  const parcial = { ...base, ingredients: ['hellmanns', 'papa'] };
+  chequear('emparejar es por prefijo, no por contención: "hellmanns" solo no alcanza',
+    !AgenteGenerador.validar(parcial, { disponibles: disp, prefs: {} }).ok, 'lo aceptó');
+
+  const conSal = [prod('Salchicha', 5, 'carnes')];
+  const dispSal = AgenteCocinero.inventarioDisponible(conSal);
+  chequear('"sal" no resuelve a "salchicha"',
+    !AgenteCocinero.buscarEnDespensa('sal', AgenteCocinero.inventarioPorIngrediente(dispSal)),
+    'resolvió');
+
+  const conDulce = [prod('Dulce de leche', 90, 'conservas')];
+  const dispDulce = AgenteCocinero.inventarioPorIngrediente(AgenteCocinero.inventarioDisponible(conDulce));
+  chequear('"leche" no resuelve a "dulce de leche"',
+    !AgenteCocinero.buscarEnDespensa('leche', dispDulce), 'resolvió');
+
+  /* ---- La alergia tiene que cubrir las dos escrituras ----
+     Es el reverso del arreglo: si el ingrediente se puede escribir de
+     varias formas, la alergia declarada también. */
+  chequear('alergia a "mayonesa" bloquea la receta con el nombre de marca',
+    !AgenteGenerador.validar(comoLoDevuelve, { disponibles: disp, prefs: { allergies: ['mayonesa'] } }).ok,
+    'la dejó pasar');
+  chequear('alergia declarada con la marca bloquea la receta que dice "mayonesa"',
+    !AgenteGenerador.validar(generico, { disponibles: disp, prefs: { allergies: ["Mayonesa Hellmann's"] } }).ok,
+    'la dejó pasar');
+
+  /* ---- El recorte del prompt no puede partir una palabra al medio ---- */
+  const largo = AgenteGenerador.sanitizar('Queso cremoso La Paulina barra especial extra grande');
+  chequear('sanitizar recorta por palabra, no por carácter',
+    !/\s$/.test(largo) && largo.split(' ').every((p) => 'Queso cremoso La Paulina barra especial extra grande'.includes(p)),
+    `dio "${largo}"`);
+}
+
+/* ======================================================================
    INYECCIÓN DE PROMPT
    ==================================================================== */
 {

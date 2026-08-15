@@ -183,10 +183,14 @@ const AgenteHogar = (() => {
     const canon = (n) => (typeof AgenteCocinero !== 'undefined'
       ? AgenteCocinero.canonizar(n) : normalizeName(n));
     const ingredientes = receta.ingredients.map(canon);
+    const mismo = (a, b) => (typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.esMismoAlimento(a, b) : canon(a) === canon(b));
 
     // 1) Alergias: filtro duro e innegociable
     perfil.alergias.forEach((al) => {
-      if (ingredientes.includes(canon(al))) bloqueos.push(`contiene ${al} (alergia declarada)`);
+      if (receta.ingredients.some((ing) => mismo(al, ing))) {
+        bloqueos.push(`contiene ${al} (alergia declarada)`);
+      }
     });
 
     // 2) Condiciones médicas de exclusión total

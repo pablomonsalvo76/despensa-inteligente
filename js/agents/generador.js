@@ -123,24 +123,45 @@ const AgenteGenerador = (() => {
     // --- LISTA CERRADA: sólo lo que hay en la despensa, más los básicos ---
     // Es lo que hace verificable todo lo que sigue: no se puede afirmar que
     // una receta está libre de un alérgeno si contiene algo no identificado.
-    const permitidos = new Set([...porIngrediente.keys(), ...BASICOS]);
-    const invasores = ingredientes.filter((i) => !permitidos.has(i));
-    if (invasores.length) return rechazo(`usa ingredientes que no tenés: ${invasores.join(', ')}`);
+    /* Se resuelve contra la despensa en vez de exigir la clave exacta. El
+       modelo sólo puede copiar el nombre que le mostró el prompt, y el
+       prompt lo sanea: con "Mayonesa Hellmann's Clásica" cargada, devolvía
+       "mayonesa hellmanns clasica" —sin el apóstrofo— y esto lo rechazaba
+       por no coincidir con su propia clave. Y escribiendo el genérico
+       "mayonesa", que es como se escriben las recetas, también.
+       `buscarEnDespensa` sólo resuelve a productos reales, así que la
+       lista sigue igual de cerrada. */
+    const enDespensa = (i) => (typeof AgenteCocinero !== 'undefined'
+      ? !!AgenteCocinero.buscarEnDespensa(i, porIngrediente) : porIngrediente.has(canon(i)));
+    const basicos = new Set(BASICOS);
+
+    const invasores = cruda.ingredients.filter((i) => !basicos.has(canon(i)) && !enDespensa(i));
+    if (invasores.length) {
+      return rechazo(`inventó ingredientes que no están en tu despensa: ${invasores.map(canon).join(', ')}`);
+    }
 
     // --- Críticos: deben existir en la despensa (nunca sólo en los básicos) ---
     const critical = Array.isArray(cruda.critical) ? cruda.critical.map(canon) : [];
     if (critical.some((c) => !ingredientes.includes(c))) return rechazo('crítico ausente de la receta');
-    if (critical.some((c) => !porIngrediente.has(c))) return rechazo('crítico que no está en la despensa');
+    if (critical.some((c) => !enDespensa(c))) return rechazo('crítico que no está en la despensa');
 
     /* --- ALERGIAS: filtro duro e innegociable (Sección 7) ---
        Las alergias se canonizan igual que los ingredientes, o la traducción
        de arriba abriría un agujero: quien declaró "milanesa" como alergia
        recibiría una receta con `carne` porque los dos textos no coinciden.
        Canonizar acá sólo puede bloquear de más, nunca de menos, que es el
-       único lado hacia el que un filtro de alergias puede equivocarse. */
-    const alergias = (prefs.allergies || []).map(canon).filter(Boolean);
-    const alergeno = ingredientes.find((i) => alergias.includes(i));
-    if (alergeno) return rechazo(`contiene ${alergeno}, declarado como alergia`);
+       único lado hacia el que un filtro de alergias puede equivocarse.
+
+       Se compara con `esMismoAlimento` y no por igualdad, por el mismo
+       motivo que arriba: si el ingrediente se puede escribir de varias
+       formas, la alergia declarada también. Quien puso "Mayonesa
+       Hellmanns" tiene que quedar cubierto ante una receta que dice
+       "mayonesa", y al revés. */
+    const mismo = (a, b) => (typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.esMismoAlimento(a, b) : canon(a) === canon(b));
+    const alergias = (prefs.allergies || []).filter(Boolean);
+    const alergeno = cruda.ingredients.find((i) => alergias.some((a) => mismo(a, i)));
+    if (alergeno) return rechazo(`contiene ${canon(alergeno)}, declarado como alergia`);
 
     // --- PAUTAS ALIMENTARIAS: se verifican, no se creen ---
     // Los tags que devuelve el modelo se descartan por completo: se recalculan
@@ -193,7 +214,16 @@ const AgenteGenerador = (() => {
   // la inyección. La defensa real igual es la lista cerrada del validador:
   // esto sólo reduce la superficie.
   function sanitizar(texto) {
-    return String(texto).replace(/[\r\n\t]+/g, ' ').replace(/[^\p{L}\p{N} .,%-]/gu, '').trim().slice(0, 40);
+    const limpio = String(texto)
+      .replace(/[\r\n\t]+/g, ' ').replace(/[^\p{L}\p{N} .,%-]/gu, '')
+      .replace(/\s+/g, ' ').trim();
+    if (limpio.length <= 40) return limpio;
+    // Recortar por palabra, no por carácter: cortando a los 40 exactos, un
+    // "Queso cremoso La Paulina barra especial" llegaba al modelo partido al
+    // medio ("...barra espe"), y lo que devolvía no coincidía con nada.
+    const corto = limpio.slice(0, 40);
+    const ultimoEspacio = corto.lastIndexOf(' ');
+    return (ultimoEspacio > 10 ? corto.slice(0, ultimoEspacio) : corto).trim();
   }
 
   // `obligatorios`: nombres de producto que la receta DEBE usar, todos. Lo

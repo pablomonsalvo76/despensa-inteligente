@@ -626,3 +626,61 @@ canoniza a nada de la despensa y se rechaza igual que antes.
 28 chequeos nuevos, varios adversarios (ingrediente inventado, alergia por
 nombre comercial, milanesa de soja, no aceptar pollo por tener carne). 302
 en total, 8 suites. sw `v42`.
+
+### El validador contra su propio prompt — 2026-08-15
+
+**Síntoma.** «No salió ninguna receta que pase los controles. Motivo: usa
+ingredientes que no tenés: mayonesa hellmanns clasica» — teniendo la
+mayonesa cargada. El mensaje llevaba a pensar que el modelo había
+inventado un producto; era exactamente al revés.
+
+**Cómo se descartó la hipótesis del "producto inventado"**: el prompt y la
+lista cerrada se arman del **mismo** `inventarioDisponible()`
+([generador.js](../js/agents/generador.js), `generar`), así que no hay
+camino por el que el modelo vea un nombre que el validador no tenga. Y una
+marca con su variante ("hellmanns clasica") no se alucina: sale del nombre
+del producto del usuario.
+
+**Causa real.** `sanitizar()` limpia los nombres antes de meterlos en el
+prompt (defensa contra inyección), pero la lista cerrada se armaba con el
+nombre **sin sanear**. El modelo sólo puede copiar lo que ve:
+
+```
+clave del validador : "mayonesa hellmann's clasica"
+en el prompt dice   : "mayonesa hellmanns clásica"   <- sin apóstrofo
+```
+
+El validador rechazaba la respuesta correcta a una pregunta que él mismo
+había hecho mal. Dos variantes del mismo defecto: el recorte a 40
+caracteres partía nombres largos al medio, y el genérico "mayonesa" —como
+se escriben las recetas de verdad— tampoco tenía clave, porque `mayonesa`
+no está entre los 35 ingredientes del recetario.
+
+**Solución: `AgenteCocinero.buscarEnDespensa(ingrediente, índice)`.**
+Resuelve un ingrediente escrito contra la despensa en tres formas, de más
+estricta a menos: clave exacta → clave con la puntuación aplanada →
+prefijo por **palabras completas** ("mayonesa" resuelve a "Mayonesa
+Hellmanns Clásica", apoyándose en que el nombre se arma con el tipo
+adelante). Por palabras y sólo como prefijo, nunca por contención: `sal`
+no resuelve a `salchicha` ni `leche` a `dulce de leche` — los dos están
+cubiertos por tests. El apóstrofo se borra en vez de separar, porque es lo
+que hace el saneo del prompt. Y `sanitizar()` ahora recorta por palabra.
+
+La lista cerrada sigue cerrada: `buscarEnDespensa` sólo resuelve a
+productos que están en la despensa; un ingrediente inventado no resuelve a
+nada.
+
+**El reverso, que es la parte delicada.** Aflojar el emparejamiento de
+ingredientes obliga a aflojar el de alergias en la misma medida, o se abre
+un agujero: quien declaró "Mayonesa Hellmann's" recibiría una receta que
+dice "mayonesa". Se agregó `esMismoAlimento(a, b)` —prefijo por palabras
+en cualquier dirección, bloquea de más y nunca de menos— y se usa en los
+tres lugares donde se verifican alergias (`generador.validar`,
+`cocinero.cumpleRestricciones`, `hogar.evaluarReceta`).
+
+**Mensaje corregido**: «usa ingredientes que no tenés» era ambiguo entre
+"los inventó" y "no los pude relacionar". Ahora dice «inventó ingredientes
+que no están en tu despensa», que es lo único que puede pasar una vez
+resuelto lo anterior.
+
+10 chequeos nuevos (312 en 8 suites). sw `v43`.
