@@ -47,7 +47,7 @@ const AgenteAprendizaje = (() => {
 
     const avoided = {};
     recetasDescartadas.forEach((id) => {
-      const receta = RECIPES.find((r) => r.id === id);
+      const receta = buscarReceta(id);
       if (!receta) return;
       // Un ingrediente suma UNA vez por receta descartada, no una por aparición.
       new Set(receta.ingredients.map(normalizeName)).forEach((norm) => {
@@ -150,7 +150,7 @@ const AgenteAprendizaje = (() => {
     DIMENSIONES.forEach((d) => { perfil[d] = {}; });
 
     ultimoPorReceta.forEach((outcome, id) => {
-      const receta = RECIPES.find((r) => r.id === id);
+      const receta = buscarReceta(id);
       if (!receta) return;
       const signo = outcome === 'cocinado' ? 1 : -1;
       DIMENSIONES.forEach((d) => {

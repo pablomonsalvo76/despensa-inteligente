@@ -33,13 +33,30 @@ const AgenteCocinero = (() => {
          "carne", que es como se escriben las recetas.
      El resultado que se veía era "no genera nada" sin ningún error visible.
 
-     La lista de ingredientes conocidos se DERIVA de `RECIPES` en vez de
-     escribirse a mano: si mañana se agrega una receta con un ingrediente
-     nuevo, esta capa lo reconoce sola y no queda desincronizada.
+     La lista de ingredientes conocidos se DERIVA del catálogo en vez de
+     escribirse a mano, y esa decisión rinde doble ahora que el recetario
+     crece: cada receta que el modelo genera y el validador aprueba le
+     enseña sus ingredientes a esta capa sola. El techo de los 35 sube con
+     el uso en vez de quedar clavado en lo que alguien escribió a mano.
+
+     Se memoiza porque `canonizar()` se llama una vez por ingrediente de
+     cada receta candidata: rearmar el Set en cada llamada era gratis con
+     27 recetas y deja de serlo con 200. Se invalida cuando cambia el
+     tamaño del catálogo, que es la única forma en que crece.
      -------------------------------------------------------------------- */
-  const INGREDIENTES_RECETARIO = new Set(
-    RECIPES.reduce((acc, r) => acc.concat(r.ingredients.map(normalizeName)), [])
-  );
+  let cacheIngredientes = { tamano: -1, set: new Set() };
+
+  function ingredientesConocidos() {
+    const catalogo = catalogoRecetas();
+    if (cacheIngredientes.tamano !== catalogo.length) {
+      cacheIngredientes = {
+        tamano: catalogo.length,
+        set: new Set(catalogo.reduce(
+          (acc, r) => acc.concat((r.ingredients || []).map(normalizeName)), []))
+      };
+    }
+    return cacheIngredientes.set;
+  }
 
   /* Nombres de góndola que NO contienen la palabra genérica adentro. Los que
      sí la contienen —"puré de tomate", "queso cremoso", "arroz integral",
@@ -84,7 +101,7 @@ const AgenteCocinero = (() => {
    */
   function canonizar(nombre) {
     const n = normalizeName(nombre);
-    if (!n || INGREDIENTES_RECETARIO.has(n)) return n;
+    if (!n || ingredientesConocidos().has(n)) return n;
     if (NO_ES_EL_GENERICO.some((e) => n.includes(e))) return n;
 
     // Un producto de soja o vegetal nunca se resuelve a un ingrediente
@@ -103,7 +120,7 @@ const AgenteCocinero = (() => {
     // 2) La palabra genérica adentro del nombre comercial: "puré de tomate"
     //    -> tomate. Antes de los alias sueltos porque también es más
     //    específica: una "milanesa de pollo" es pollo, no carne.
-    const directo = n.split(/[^a-z0-9]+/).find((p) => p && INGREDIENTES_RECETARIO.has(p));
+    const directo = n.split(/[^a-z0-9]+/).find((p) => p && ingredientesConocidos().has(p));
     if (directo) return directo;
 
     // 3) Nombres de góndola que no contienen la palabra genérica en ningún lado.
@@ -437,7 +454,7 @@ const AgenteCocinero = (() => {
     // producto llamado carne?". Se arma una sola vez para las 27 recetas.
     const ingMap = inventarioPorIngrediente(invMap);
 
-    return RECIPES
+    return catalogoRecetas()
       .filter((r) => !descartadas.has(r.id))
       .filter((r) => cumpleRestricciones(r, prefs))
       .filter((r) => tieneCriticosDisponibles(r, ingMap))
@@ -618,7 +635,7 @@ const AgenteCocinero = (() => {
      una alternativa útil puede estar más abajo en el ranking general.
      -------------------------------------------------------------------- */
   function alternativasA(recipeId, enriquecidos, max = 2) {
-    const original = RECIPES.find((r) => r.id === recipeId);
+    const original = buscarReceta(recipeId);
     if (!original) return [];
 
     const ingMap = inventarioPorIngrediente(inventarioNormalizado(enriquecidos));
@@ -627,7 +644,7 @@ const AgenteCocinero = (() => {
       .filter((n) => ingMap.has(n));
     if (!criticosDisponibles.length) return [];
 
-    return suggestRecipes(enriquecidos, { max: RECIPES.length })
+    return suggestRecipes(enriquecidos, { max: catalogoRecetas().length })
       .filter((c) => c.receta.id !== recipeId)
       .filter((c) => c.receta.ingredients
         .some((ing) => criticosDisponibles.includes(canonizar(ing))))
@@ -640,7 +657,7 @@ const AgenteCocinero = (() => {
 
   function listarDescartadas() {
     return DB.get('dismissedRecipes', [])
-      .map((d) => ({ ...d, receta: RECIPES.find((r) => r.id === d.recipeId) }))
+      .map((d) => ({ ...d, receta: buscarReceta(d.recipeId) }))
       .filter((d) => d.receta);
   }
 

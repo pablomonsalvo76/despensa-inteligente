@@ -45,7 +45,7 @@ const AgenteCompras = (() => {
 
     const sugerencias = {}; // ingrediente -> { rescata:Set, recetas:Set, faltanConEl }
 
-    RECIPES.forEach((receta) => {
+    catalogoRecetas().forEach((receta) => {
       // Respeta el hogar: no proponer comprar para una receta que alguien
       // de la casa no puede comer.
       if (perfil) {

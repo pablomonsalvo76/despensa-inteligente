@@ -18,7 +18,7 @@ const DB = (() => {
   // Stores que componen la memoria persistente (Sección 6).
   const STORES = ['products', 'history', 'preferences', 'consumptionPatterns', 'gtinCache',
     'dismissedRecipes', 'profile', 'household', 'shoppingState', 'notificationState', 'systemLog',
-    'stylePreferences', 'aiProviderConfig'];
+    'stylePreferences', 'aiProviderConfig', 'learnedRecipes'];
 
   function _key(store) {
     return `${NS}::${store}`;
@@ -119,7 +119,13 @@ const DB = (() => {
       notificationState: _read('notificationState', {}),
       systemLog: _read('systemLog', []),
       stylePreferences: _read('stylePreferences', null),
-      aiProviderConfig: _read('aiProviderConfig', {})
+      aiProviderConfig: _read('aiProviderConfig', {}),
+      // El recetario aprendido es memoria del usuario, no configuración:
+      // sin esto, cambiar de teléfono le borra todas las recetas que el
+      // modelo generó para su despensa. Es el mismo olvido que ya se
+      // cometió con `stylePreferences` — esta lista se escribe a mano y
+      // no se deriva de STORES, así que agregar un store nuevo NO alcanza.
+      learnedRecipes: _read('learnedRecipes', [])
     }, null, 2),
 
     importAll: (json) => {
@@ -143,6 +149,7 @@ const DB = (() => {
       _write('systemLog', Array.isArray(data.systemLog) ? data.systemLog : []);
       if (data.stylePreferences && typeof data.stylePreferences === 'object') _write('stylePreferences', data.stylePreferences);
       _write('aiProviderConfig', data.aiProviderConfig && typeof data.aiProviderConfig === 'object' ? data.aiProviderConfig : {});
+      _write('learnedRecipes', Array.isArray(data.learnedRecipes) ? data.learnedRecipes : []);
       init(); // completa cualquier store faltante con sus valores por defecto
       return { productos: data.products.length, desenlaces: (data.history || []).length };
     }

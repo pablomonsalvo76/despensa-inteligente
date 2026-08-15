@@ -24,7 +24,7 @@ const AgenteEvaluador = (() => {
    * es el comportamiento menos sorprendente para el usuario.
    */
   function descontarIngredientesDeReceta(recipeId) {
-    const receta = RECIPES.find((r) => r.id === recipeId);
+    const receta = buscarReceta(recipeId);
     if (!receta) return { consumidos: [], descontados: [] };
 
     const activos = AgenteInventario.activos()

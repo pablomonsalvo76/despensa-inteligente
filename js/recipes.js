@@ -442,3 +442,109 @@ function normalizeName(text) {
     .trim()
     .replace(/s$/, ''); // heurística simple de singularización
 }
+
+/* =====================================================================
+   RECETARIO QUE CRECE
+   ---------------------------------------------------------------------
+   Las 27 recetas de arriba son el PISO: escritas a mano, disponibles sin
+   internet, sin modelo y sin cuota. Ayer eso dejó de ser teórico — se
+   agotó la cuota gratuita de Gemini y fueron lo único que siguió
+   respondiendo.
+
+   Pero un recetario fijo tiene un techo obvio: 27 recetas cubren 35
+   ingredientes, y una despensa real tiene muchos más. Cargar quinoa,
+   palta y kiwi devolvía CERO recetas.
+
+   Acá está la otra mitad. Cada receta que el modelo genera y que
+   `AgenteGenerador.validar()` aprueba se guarda y pasa a formar parte
+   del catálogo. Desde ese momento:
+
+     · aparece en el ranking junto a las 27 originales;
+     · está disponible OFFLINE y sin gastar cuota, para siempre;
+     · le enseña sus ingredientes a `AgenteCocinero.canonizar()`, que
+       deriva de acá la lista de lo que sabe cocinar — así que el techo
+       de los 35 sube solo;
+     · entra en el aprendizaje de gusto igual que cualquier otra, porque
+       `validar()` ya le asigna `cocina`, `estilo` y `tipo`.
+
+   No hace falta un concepto nuevo para rechazarlas: si el usuario
+   descarta una, `dismissedRecipes` la filtra igual que a una fija.
+
+   Guardar una receta generada NO es un atajo sobre la seguridad. Se
+   guarda ya validada, y además se vuelve a filtrar contra alergias,
+   pautas y el perfil del hogar CADA VEZ que se sugiere: una alergia
+   declarada mañana bloquea una receta guardada ayer.
+   ===================================================================== */
+
+// Tope de recetas aprendidas. `localStorage` no es infinito y el resto de
+// la app comparte ese espacio; sin límite, el recetario terminaría
+// desalojando el inventario, que es el dato que no se puede perder.
+const MAX_RECETAS_APRENDIDAS = 200;
+
+/* Cache en memoria: `canonizar()` consulta el catálogo por cada
+   ingrediente de cada receta candidata, así que sin esto cada render
+   haría decenas de `JSON.parse` sobre localStorage. Se invalida al
+   guardar; una importación de datos recarga la página entera. */
+let _aprendidasCache = null;
+
+function recetasAprendidas() {
+  if (_aprendidasCache) return _aprendidasCache;
+  const guardadas = DB.get('learnedRecipes', []);
+  _aprendidasCache = Array.isArray(guardadas) ? guardadas : [];
+  return _aprendidasCache;
+}
+
+/** El catálogo completo: las fijas más las aprendidas. */
+function catalogoRecetas() {
+  return RECIPES.concat(recetasAprendidas());
+}
+
+/** Busca por id en todo el catálogo, no sólo en las fijas. */
+function buscarReceta(id) {
+  return catalogoRecetas().find((r) => r.id === id) || null;
+}
+
+// Huella para no guardar dos veces la misma receta con distinto nombre:
+// lo que la define es el conjunto de ingredientes, no cómo la tituló el
+// modelo esta vez.
+function huellaReceta(receta) {
+  return (receta.ingredients || []).map(normalizeName).sort().join('|');
+}
+
+/**
+ * Incorpora al catálogo una receta ya validada. Devuelve true si se
+ * guardó, false si ya estaba.
+ */
+function recordarReceta(receta) {
+  if (!receta || !receta.id || !Array.isArray(receta.ingredients)) return false;
+
+  const guardadas = recetasAprendidas();
+  const huella = huellaReceta(receta);
+  if (guardadas.some((r) => huellaReceta(r) === huella)) return false;
+
+  guardadas.push({ ...receta, aprendidaEl: new Date().toISOString() });
+  DB.set('learnedRecipes', podarAprendidas(guardadas));
+  _aprendidasCache = null;
+  return true;
+}
+
+/* Al llegar al tope se descartan las más viejas, pero NUNCA una que el
+   usuario haya cocinado: esa dejó de ser una propuesta del modelo y pasó
+   a ser parte de su repertorio real. Es el mismo criterio que ordena todo
+   el aprendizaje del sistema — la conducta pesa más que la novedad. */
+function podarAprendidas(lista) {
+  if (lista.length <= MAX_RECETAS_APRENDIDAS) return lista;
+
+  const cocinadas = new Set(
+    DB.get('history', [])
+      .filter((h) => h.outcome === 'cocinado' && h.recipeId)
+      .map((h) => h.recipeId)
+  );
+
+  const protegidas = lista.filter((r) => cocinadas.has(r.id));
+  const resto = lista
+    .filter((r) => !cocinadas.has(r.id))
+    .sort((a, b) => String(b.aprendidaEl || '').localeCompare(String(a.aprendidaEl || '')));
+
+  return protegidas.concat(resto).slice(0, MAX_RECETAS_APRENDIDAS);
+}

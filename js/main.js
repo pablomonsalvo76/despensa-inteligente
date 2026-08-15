@@ -2598,7 +2598,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('historial-list').innerHTML = hist.length === 0
       ? `<div class="empty-state">Todavía no se registraron desenlaces.</div>`
       : hist.map((h) => {
-          const receta = h.recipeId ? RECIPES.find((r) => r.id === h.recipeId) : null;
+          const receta = h.recipeId ? buscarReceta(h.recipeId) : null;
           const producto = h.productId ? AgenteInventario.getById(h.productId) : null;
           const nombre = producto ? producto.name : (receta ? receta.name : 'Item');
           return `<div class="list-row">

@@ -44,7 +44,7 @@ function nuevoContexto() {
    'js/agents/generador.js'
   ].forEach((f) => vm.runInContext(leer(f), sandbox, { filename: f }));
 
-  vm.runInContext(`globalThis.__api = { DB, AgenteGenerador, AgenteCocinero, AgenteHogar, AIProvider };`, sandbox);
+  vm.runInContext(`globalThis.__api = { DB, AgenteGenerador, AgenteCocinero, AgenteHogar, AIProvider, RECIPES, catalogoRecetas, recetasAprendidas, buscarReceta };`, sandbox);
   return sandbox.__api;
 }
 
@@ -427,6 +427,88 @@ const DESPENSA = [
    CADENA COMPLETA con motor falso
    ==================================================================== */
 (async () => {
+  {
+  /* ======================================================================
+     RECETARIO QUE CRECE — lo generado deja de perderse
+     ----------------------------------------------------------------------
+     Antes, una receta que el modelo generaba y el validador aprobaba se
+     mostraba una vez y se perdía. Costaba un pedido de una cuota que se
+     mide por día, y al día siguiente había que gastarlo de nuevo para lo
+     mismo. Ahora se incorpora al catálogo: queda offline, sin cuota, y le
+     enseña sus ingredientes al motor.
+     ==================================================================== */
+    const api = nuevoContexto();
+    const { AgenteGenerador, AgenteCocinero, AIProvider, DB } = api;
+
+    // Despensa que el recetario fijo no conoce: sin esto, cero recetas.
+    const exotica = [prod('Quinoa', 3, 'cereales', 'Alacena'), prod('Palta', 2, 'frutas', 'Heladera')];
+
+    chequear('el recetario arranca sin recetas aprendidas',
+      api.recetasAprendidas().length === 0, `tenía ${api.recetasAprendidas().length}`);
+    chequear('con productos que el recetario no conoce no hay sugerencias',
+      AgenteCocinero.suggestRecipes(exotica).length === 0,
+      `devolvió ${AgenteCocinero.suggestRecipes(exotica).length}`);
+
+    AIProvider.configurar({ motor: 'gemini' });
+    AIProvider.usarMotorFalso(async () => JSON.stringify({
+      name: 'Ensalada de quinoa y palta', ingredients: ['quinoa', 'palta', 'sal'],
+      critical: ['quinoa'], cookTimeMin: 20, servings: 2,
+      cocina: 'internacional', tipo: 'principal',
+      steps: ['Hervi la quinoa 15 minutos y dejala enfriar.', 'Sumá la palta en cubos y salá.']
+    }));
+
+    await (async () => {
+      const res = await AgenteGenerador.generar(exotica);
+      chequear('el modelo genera una receta con productos que el recetario no conocía',
+        res.recetas.length === 1, JSON.stringify(res.rechazadas));
+
+      chequear('la receta aprobada se guarda en el catálogo',
+        api.recetasAprendidas().length === 1, `hay ${api.recetasAprendidas().length}`);
+      chequear('y entra en el catálogo completo',
+        api.catalogoRecetas().length === api.RECIPES.length + 1, `${api.catalogoRecetas().length}`);
+      chequear('se puede buscar por id como cualquier otra',
+        !!api.buscarReceta(res.recetas[0].id), 'no la encontró');
+
+      // Lo que cierra el círculo: ahora aparece SIN llamar al modelo.
+      AIProvider.configurar({ motor: 'ninguno' });
+      const sug = AgenteCocinero.suggestRecipes(exotica);
+      chequear('REGRESIÓN: la receta aprendida se sugiere sin modelo ni conexión',
+        sug.some((c) => /quinoa/i.test(c.receta.name)),
+        JSON.stringify(sug.map((c) => c.receta.name)));
+
+      // Y el techo de los 35 ingredientes sube solo.
+      chequear('el motor aprendió los ingredientes nuevos',
+        AgenteCocinero.canonizar('quinoa') === 'quinoa'
+        && AgenteCocinero.canonizar('Palta Hass') === 'palta',
+        `quinoa=${AgenteCocinero.canonizar('quinoa')} palta=${AgenteCocinero.canonizar('Palta Hass')}`);
+
+      // Generar lo mismo dos veces no puede duplicar el catálogo.
+      AIProvider.configurar({ motor: 'gemini' });
+      await AgenteGenerador.generar(exotica);
+      chequear('no se guarda dos veces la misma receta',
+        api.recetasAprendidas().length === 1, `hay ${api.recetasAprendidas().length}`);
+
+      // Si el usuario la descarta, desaparece igual que una fija: no hace
+      // falta un concepto nuevo para rechazar lo aprendido.
+      AgenteCocinero.descartarReceta(res.recetas[0].id);
+      AIProvider.configurar({ motor: 'ninguno' });
+      chequear('descartar una receta aprendida la saca de las sugerencias',
+        !AgenteCocinero.suggestRecipes(exotica).some((c) => c.receta.id === res.recetas[0].id),
+        'seguía apareciendo');
+
+      // El recetario aprendido es memoria del usuario: si no entra en la
+      // copia de seguridad se pierde. Ese bug exacto ya lo tuvimos con
+      // `stylePreferences`.
+      // exportAll() enumera los stores A MANO, no desde STORES: agregar
+      // un store nuevo no basta. Este chequeo existe porque ese olvido
+      // exacto ya nos borró `stylePreferences` una vez.
+      chequear('el recetario aprendido entra en la copia de seguridad',
+        Array.isArray(JSON.parse(DB.exportAll()).learnedRecipes), 'no está en el export');
+
+      return true;
+    })();
+  }
+
   const { DB, AgenteGenerador } = nuevoContexto();
   DB.set('preferences', { allergies: ['huevo'] });
 

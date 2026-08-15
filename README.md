@@ -86,7 +86,7 @@ exportar/importar). La base de recetas curadas, en `js/recipes.js`.
 | Inventario, semáforo, alertas, historial, log del ciclo | Real, con persistencia local |
 | Escaneo de código de barras | Real: cámara + `html5-qrcode`, resuelve el GTIN contra Open Food Facts (API pública, sin API key) |
 | OCR de fecha de vencimiento | Real: cámara + PP-OCR (ONNX Runtime Web) en el navegador, con Tesseract.js como respaldo |
-| Recetas del recetario | Real: 27 recetas curadas con instrucciones paso a paso |
+| Recetas del recetario | Real: **el recetario crece**. Arranca con 27 recetas curadas paso a paso, y cada receta que el modelo genera y el validador aprueba se incorpora al catálogo: queda disponible offline, sin gastar cuota, y le enseña sus ingredientes al motor de equivalencias |
 | Recetas para "varios productos por vencer a la vez" | Real: `recetasParaVencer` busca en el recetario una receta que use la mayor cantidad posible de los productos prioritarios (combo) más una por cada producto suelto |
 | Generación de recetas nuevas | Real, con LLM vía `AIProvider`. Gemini viene activado de fábrica (proyecto propio de la app); se puede apagar o cambiar a Ollama/proyecto propio en Preferencias. Si está apagado, el recetario sigue funcionando |
 | Respaldo de visión para fecha/nombre difíciles | Real, con Gemini vía Firebase AI Logic (activado de fábrica). Sólo detrás de un botón explícito ("Leer con IA"); nunca se dispara solo ni reemplaza al OCR local |
@@ -132,7 +132,7 @@ las decisiones posteriores son malas.
 
 ## Verificación
 
-Ocho suites, **324 pruebas**, sin dependencias externas:
+Ocho suites, **335 pruebas**, sin dependencias externas:
 
 ```bash
 node tests/fechas.test.js         # 55 — parseo de fechas de envase y OCR
@@ -141,7 +141,7 @@ node tests/preprocesado.test.js   # 19 — recorte, binarización y contraste de
 node tests/escaneo.test.js        # 36 — escaneo continuo (código + fecha + nombre)
 node tests/recomendacion.test.js  # 58 — ranking de recetas, equivalencia de ingredientes y aprendizaje
 node tests/estilo.test.js         # 19 — aprendizaje de gusto y exploración
-node tests/generacion.test.js     # 64 — veto determinístico sobre el LLM
+node tests/generacion.test.js     # 75 — veto determinístico sobre el LLM y recetario que crece
 node tests/aiProvider.test.js     # 32 — proveedor de IA compartido, visión y traducción de errores
 ```
 

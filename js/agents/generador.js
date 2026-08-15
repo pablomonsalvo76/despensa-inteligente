@@ -331,7 +331,10 @@ const AgenteGenerador = (() => {
       if (!cruda) { rechazadas.push({ motivo: 'el modelo no devolvió JSON válido' }); continue; }
 
       const v = validar(cruda, { disponibles, prefs, perfilHogar });
-      if (v.ok) recetas.push(v.receta);
+      // Una receta que pasó `validar()` es tan confiable como cualquiera de
+      // las 27 escritas a mano: se incorpora al catálogo y queda disponible
+      // offline y sin cuota para siempre. Ver `recordarReceta` en recipes.js.
+      if (v.ok) { recordarReceta(v.receta); recetas.push(v.receta); }
       else rechazadas.push({ motivo: v.motivo, nombre: cruda.name });
     }
 
@@ -386,6 +389,7 @@ const AgenteGenerador = (() => {
         continue;
       }
 
+      recordarReceta(v.receta);
       return { receta: v.receta, rechazadas };
     }
 

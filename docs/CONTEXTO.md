@@ -254,10 +254,31 @@ consigna. Estado relevado el 2026-07-30 contra esa grilla:
   el co-work + reflexión) y `docs/capturas/` (evidencia, mín. 3 capturas +
   log de sesión real): no encontré ningún archivo que las cubra todavía.
 
+### Estado actualizado — 2026-08-15
+
+El relevamiento de arriba quedó viejo y se conserva sólo como registro de
+por dónde se empezó. Lo que vale hoy:
+
+- ✅ **UX/UI · Nielsen (20%)** → `docs/UX_NIELSEN.md`, las 10 heurísticas.
+  **Pendiente adentro**: la sección 5.2 pide una prueba informal con una
+  persona que no haya visto la app. Es el único hueco del documento.
+- ✅ **Ciberseguridad (10%)** → `docs/CIBERSEGURIDAD.md`, 7 riesgos,
+  incluida la degradación honesta de App Check.
+- ✅ **Secciones 1 y 7** → `docs/EQUIPO_Y_COWORK.md`.
+- ❌ **`docs/capturas/`**: sigue vacía (sólo el README con la checklist).
+  Es lo único con un ❌ duro sobre la grilla, y pesa dentro del 30% de
+  "app funcionando". Requiere el celular del autor: no se puede generar
+  desde el repositorio.
+
 **Hecho el 2026-07-31**: `README.md` y `docs/DIAGRAMAS.md` estaban
 desactualizados (describían Tesseract.js como motor de OCR principal y
 "112 pruebas" en 4 suites) — corregido para reflejar PP-OCR + Tesseract de
 respaldo y las 211 pruebas reales en 7 suites.
+
+**Hecho el 2026-08-15**: el README volvió a quedar viejo con el conteo de
+pruebas (decía 226) — corregido a las **324 reales en 8 suites**, contadas
+una por una. Un número inflado en el documento que lee el docente es
+exactamente el tipo de detalle que destruye la credibilidad del resto.
 
 ### Discusión abierta — límite de las 27 recetas fijas
 
@@ -769,3 +790,57 @@ mucho); o apoyarse en que el recetario fijo funciona sin cuota ni conexión
 —que es exactamente lo que la arquitectura en dos capas garantiza—.
 
 5 chequeos nuevos (328 en 8 suites). sw `v45`.
+
+### El recetario deja de ser fijo — 2026-08-15
+
+**Planteo del autor**: *"no me gusta tener 35 recetas predefinidas por un
+JSON, no es una buena solución"*. Correcto en el fondo, pero la salida no
+era sacar el recetario: era hacerlo crecer.
+
+**Por qué el piso fijo se queda.** Ese mismo día, a las 14:49, se agotó la
+cuota gratuita de Gemini y las 27 recetas escritas a mano fueron lo único
+que siguió respondiendo. No son sólo una limitación: son lo que evita que
+la app quede muerta sin conexión o sin cuota.
+
+**Qué se agregó.** Cada receta que el modelo genera y que `validar()`
+aprueba se guarda (`recordarReceta` en `js/recipes.js`) y pasa a formar
+parte del catálogo. Desde ese momento:
+
+- aparece en el ranking junto a las 27 originales;
+- está disponible **offline y sin gastar cuota**, para siempre — la receta
+  que hoy cuesta un pedido de un plan que se mide por día, mañana es gratis;
+- le enseña sus ingredientes a `AgenteCocinero.canonizar()`, que deriva de
+  ahí lo que sabe cocinar: **el techo de los 35 ingredientes sube solo**;
+- entra en el aprendizaje de gusto como cualquier otra, porque `validar()`
+  ya le asigna `cocina`, `estilo` y `tipo`.
+
+`catalogoRecetas()` y `buscarReceta(id)` reemplazan a `RECIPES` en los 8
+lugares que lo consultaban (cocinero, aprendizaje, evaluador, compras,
+main). Si alguno hubiera quedado sin migrar, lo aprendido sería invisible
+justo para el agente que lo dejó afuera.
+
+**Lo que NO hizo falta inventar**: un mecanismo para rechazar lo aprendido.
+Si el usuario descarta una receta generada, `dismissedRecipes` la filtra
+igual que a una fija. Y la seguridad no se relaja: la receta se guarda ya
+validada, y se vuelve a filtrar contra alergias, pautas y perfil del hogar
+**cada vez** que se sugiere, así que una alergia declarada mañana bloquea
+una receta guardada ayer.
+
+**Decisiones que no son obvias:**
+- **Tope de 200 con desalojo protegido.** `localStorage` es compartido con
+  el inventario, que es el dato que no se puede perder. Al llegar al tope
+  se descartan las más viejas, pero **nunca una que el usuario cocinó**:
+  esa dejó de ser una propuesta del modelo y pasó a ser su repertorio.
+- **Deduplicación por ingredientes, no por nombre.** Lo que define una
+  receta es lo que lleva, no cómo la tituló el modelo esa vez.
+- **Cache en memoria de lo aprendido.** `canonizar()` consulta el catálogo
+  por cada ingrediente de cada receta candidata; sin cache eran decenas de
+  `JSON.parse` por render.
+
+**Bug encontrado por el test nuevo**: `DB.exportAll()` enumera los stores
+**a mano**, no desde `STORES`. Agregar `learnedRecipes` a `STORES` no
+alcanzaba — el recetario aprendido no entraba en la copia de seguridad y
+se perdía al cambiar de teléfono. Es *el mismo olvido* que ya se había
+cometido con `stylePreferences`. Corregido en `exportAll` e `importAll`.
+
+11 chequeos nuevos (335 en 8 suites). sw `v46`.
