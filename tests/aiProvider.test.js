@@ -174,6 +174,50 @@ async function chequearAsync(desc, fn) {
   }
 
   /* ======================================================================
+     2b · Errores del modelo, traducidos
+     ----------------------------------------------------------------------
+     El SDK devuelve el volcado del error HTTP completo y eso se imprimía
+     tal cual en pantalla: ocupaba la pantalla entera y no decía si era
+     culpa del usuario, si se arreglaba solo, ni qué hacer mientras tanto.
+     ==================================================================== */
+  {
+    const { AIProvider } = nuevoContexto().api;
+    const t = (e) => AIProvider.traducirError(e).message;
+
+    // Textual, tal como llegó a la pantalla del usuario.
+    const CUOTA = 'AI: Error fetching from https://firebasevertexai.googleapis.com/v1beta/'
+      + 'projects/despensa-inteligente-ia/models/gemini-3.6-flash:generateContent: [429 ] '
+      + 'You exceeded your current quota, please check your plan and billing details. '
+      + 'For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. '
+      + '* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, '
+      + 'limit: 20, model: gemini-3.6-flash Please retry in 8.245768379s. '
+      + '[{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas"}]}]';
+
+    const cuota = t(new Error(CUOTA));
+    chequear('la cuota agotada se explica en una frase', cuota.length < 120, `${cuota.length} caracteres`);
+    chequear('y dice cuánto esperar', /9 segundos/.test(cuota), cuota);
+    chequear('sin volcar el JSON del error', !/@type|googleapis/.test(cuota), cuota);
+
+    chequear('cuota sin tiempo sugerido ofrece la alternativa offline',
+      /recetario/i.test(t(new Error('[429] RESOURCE_EXHAUSTED'))), t(new Error('[429] RESOURCE_EXHAUSTED')));
+
+    chequear('un 503 se lee como sobrecarga temporal',
+      /sobrecargado/i.test(t(new Error('[503] The model is overloaded'))), t(new Error('[503] UNAVAILABLE')));
+    chequear('un 403 manda a revisar la credencial',
+      /credencial/i.test(t(new Error('[403] PERMISSION_DENIED: API key not valid'))),
+      t(new Error('[403] PERMISSION_DENIED')));
+    chequear('sin red avisa que el recetario sigue andando',
+      /recetario/i.test(t(new TypeError('Failed to fetch'))), t(new TypeError('Failed to fetch')));
+
+    // Lo desconocido no se inventa ni se vuelca entero.
+    const raro = t(new Error('Algo inesperado\ncon muchas líneas\ny más'.repeat(20)));
+    chequear('un error desconocido se acota a una línea',
+      raro.length <= 140 && !raro.includes('\n'), `${raro.length} caracteres`);
+    chequear('un error vacío no deja el mensaje en blanco',
+      t(new Error('')).length > 0, `"${t(new Error(''))}"`);
+  }
+
+  /* ======================================================================
      3 · AgenteCaptura.leerConVisionIA
      ==================================================================== */
   {

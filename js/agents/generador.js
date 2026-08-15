@@ -310,7 +310,12 @@ const AgenteGenerador = (() => {
       try {
         cruda = AIProvider.parsearJSON(await AIProvider.generarTexto(prompt));
       } catch (e) {
-        rechazadas.push({ motivo: e.message });
+        // `fallaDelModelo` distingue "el modelo no contestó" de "contestó y
+        // el validador la rechazó". Son dos cosas muy distintas para el
+        // usuario —una se arregla sola, la otra no— y la pantalla las
+        // presentaba iguales, bajo un "no pasó los controles" que en este
+        // caso es falso: no hubo nada que controlar.
+        rechazadas.push({ motivo: e.message, fallaDelModelo: true });
         break; // si el motor falla, reintentar no cambia nada
       }
       if (!cruda) { rechazadas.push({ motivo: 'el modelo no devolvió JSON válido' }); continue; }
@@ -352,7 +357,7 @@ const AgenteGenerador = (() => {
       try {
         cruda = AIProvider.parsearJSON(await AIProvider.generarTexto(prompt));
       } catch (e) {
-        rechazadas.push({ motivo: e.message });
+        rechazadas.push({ motivo: e.message, fallaDelModelo: true });
         break;
       }
       if (!cruda) { rechazadas.push({ motivo: 'el modelo no devolvió JSON válido' }); continue; }

@@ -992,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // agrega ruido a una pantalla que ya sobraba de contenido.
         mostrarLecturaCruda(res.textoDetectado, 'Ver lo que devolvió la IA');
       } catch (e) {
-        if (estado) estado.textContent = 'No se pudo hablar con el modelo (' + (e.message || e) + ').';
+        if (estado) estado.textContent = (e.message || String(e));
       }
       btn.disabled = false;
     };
@@ -1413,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         mostrarTextoCrudo(res.textoDetectado);
       } catch (e) {
-        if (estado) estado.textContent = 'No se pudo hablar con el modelo (' + (e.message || e) + ').';
+        if (estado) estado.textContent = (e.message || String(e));
       }
       btn.disabled = false;
     };
@@ -1584,6 +1584,22 @@ document.addEventListener('DOMContentLoaded', () => {
      siempre un botón explícito, porque tiene costo y manda datos afuera. */
   let paraVencerCache = { combo: null, individuales: [], prioritarios: [] };
 
+  /* Por qué no salió una receta generada. Dos casos que la pantalla trataba
+     igual y no lo son: si el modelo no contestó (sin conexión, cuota
+     agotada) hablar de "controles" es falso —no hubo nada que controlar— y
+     además manda al usuario a buscar un problema en su despensa que no
+     existe. Si contestó y el validador la rechazó, ahí sí el motivo es la
+     información útil y se muestra. */
+  function motivoGeneracion(rechazadas) {
+    const lista = rechazadas || [];
+    const fallo = lista.find((r) => r.fallaDelModelo);
+    if (fallo) return escapeHtml(fallo.motivo || 'El modelo no respondió.');
+
+    const motivos = lista.map((r) => r.motivo).filter(Boolean);
+    return `No salió ninguna receta que pase los controles.${
+      motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
+  }
+
   function candidataDesdeGenerada(receta, prioritarios, enriquecidos) {
     return {
       receta,
@@ -1671,12 +1687,17 @@ document.addEventListener('DOMContentLoaded', () => {
           if (res.receta) {
             abrirRecetaCandidata(candidataDesdeGenerada(res.receta, paraVencerCache.prioritarios, enriquecidos));
           } else {
-            const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
-            if (estado) estado.textContent = `No se pudo generar una que los use a todos.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
+            const fallo = (res.rechazadas || []).find((x) => x.fallaDelModelo);
+            if (estado) {
+              estado.textContent = fallo
+                ? fallo.motivo
+                : `No se pudo generar una que los use a todos.${
+                    res.rechazadas && res.rechazadas[0] ? ` Motivo: ${res.rechazadas[0].motivo}.` : ''}`;
+            }
             btnComboIA.disabled = false;
           }
         } catch (e) {
-          if (estado) estado.textContent = `No se pudo hablar con el modelo (${escapeHtml(e.message || String(e))}).`;
+          if (estado) estado.textContent = (e.message || String(e));
           btnComboIA.disabled = false;
         }
       });
@@ -1695,12 +1716,17 @@ document.addEventListener('DOMContentLoaded', () => {
           if (res.receta) {
             abrirRecetaCandidata(candidataDesdeGenerada(res.receta, [producto], enriquecidos));
           } else {
-            const motivos = (res.rechazadas || []).map((x) => x.motivo).filter(Boolean);
-            if (estado) estado.textContent = `No se pudo generar una receta con ${nombre}.${motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}`;
+            const fallo = (res.rechazadas || []).find((x) => x.fallaDelModelo);
+            if (estado) {
+              estado.textContent = fallo
+                ? fallo.motivo
+                : `No se pudo generar una receta con ${nombre}.${
+                    res.rechazadas && res.rechazadas[0] ? ` Motivo: ${res.rechazadas[0].motivo}.` : ''}`;
+            }
             btn.disabled = false;
           }
         } catch (e) {
-          if (estado) estado.textContent = `No se pudo hablar con el modelo (${escapeHtml(e.message || String(e))}).`;
+          if (estado) estado.textContent = (e.message || String(e));
           btn.disabled = false;
         }
       });
@@ -2503,9 +2529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!res.recetas.length) {
           // Se muestra POR QUÉ se rechazó, no un "no se pudo" opaco: que el
           // filtro haya actuado es información útil, no un error a esconder.
-          const motivos = (res.rechazadas || []).map((r) => r.motivo).filter(Boolean);
-          estado.innerHTML = `<div class="empty-state">No salió ninguna receta que pase los controles.${
-            motivos.length ? ` Motivo: ${escapeHtml(motivos[0])}.` : ''}</div>`;
+          estado.innerHTML = `<div class="empty-state">${motivoGeneracion(res.rechazadas)}</div>`;
           return;
         }
 

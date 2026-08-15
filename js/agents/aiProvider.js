@@ -98,7 +98,7 @@ const AIProvider = (() => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelo, prompt, stream: false, format: 'json' })
     });
-    if (!resp.ok) throw new Error(`Ollama respondió ${resp.status}`);
+    if (!resp.ok) throw traducirError(new Error(`Ollama respondió ${resp.status}`));
     const data = await resp.json();
     return data.response;
   }
@@ -164,6 +164,42 @@ const AIProvider = (() => {
     return modeloGemini;
   }
 
+  /* ---- Errores del modelo, en castellano y accionables ------------------
+     Lo que devuelve el SDK cuando algo falla es un volcado del error HTTP
+     entero: JSON anidado, links a documentación, nombres de métrica de
+     cuota. Eso terminaba impreso tal cual en la pantalla —ocupándola
+     completa— y no decía lo único que el usuario necesita saber: si es
+     culpa suya, si se arregla solo, y qué puede hacer mientras tanto.
+
+     El detalle completo sigue yendo a la consola, que es donde sirve para
+     diagnosticar. Acá se traduce a una frase con la acción concreta.
+
+     El orden de los chequeos importa: el mensaje de cuota incluye la
+     palabra "API" y un link a la documentación, así que si el chequeo de
+     credenciales corriera primero se lo quedaría él. */
+  function traducirError(e) {
+    const texto = String((e && e.message) || e || '');
+
+    if (/\b429\b|quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(texto)) {
+      const m = texto.match(/retry in ([\d.]+)\s*s/i) || texto.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+      const espera = m ? Math.ceil(Number(m[1])) : null;
+      return new Error(espera
+        ? `Se llegó al límite de uso gratuito del modelo. Probá de nuevo en ${espera} segundo${espera === 1 ? '' : 's'}.`
+        : 'Se agotó la cuota gratuita del modelo por ahora. El recetario sigue funcionando sin el modelo.');
+    }
+    if (/\b5\d\d\b|UNAVAILABLE|overloaded/i.test(texto)) {
+      return new Error('El modelo está sobrecargado en este momento. Probá de nuevo en un minuto.');
+    }
+    if (/\b40[13]\b|PERMISSION_DENIED|UNAUTHENTICATED|api[- ]?key|app-?check/i.test(texto)) {
+      return new Error('El modelo rechazó la credencial de la app. Revisá Preferencias → IA en la nube.');
+    }
+    if (/failed to fetch|networkerror|err_internet|offline/i.test(texto)) {
+      return new Error('No se pudo conectar con el modelo. El recetario funciona igual sin internet.');
+    }
+    // Cualquier otra cosa: la primera línea, acotada. Nunca el volcado entero.
+    return new Error(texto.split('\n')[0].trim().slice(0, 140) || 'El modelo no respondió.');
+  }
+
   async function invocarGemini(prompt, partes = []) {
     const modelo = await prepararGemini();
     try {
@@ -173,7 +209,7 @@ const AIProvider = (() => {
       console.error('generateContent falló:', e);
       console.error('  code:', e && e.code);
       console.error('  customData:', e && e.customData);
-      throw e;
+      throw traducirError(e);
     }
   }
 
@@ -214,6 +250,6 @@ const AIProvider = (() => {
 
   return {
     configurar, leerConfig, disponible, soportaImagenes,
-    generarTexto, generarConImagen, parsearJSON, usarMotorFalso
+    generarTexto, generarConImagen, parsearJSON, usarMotorFalso, traducirError
   };
 })();

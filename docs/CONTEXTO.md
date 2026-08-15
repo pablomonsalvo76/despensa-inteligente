@@ -684,3 +684,44 @@ que no están en tu despensa», que es lo único que puede pasar una vez
 resuelto lo anterior.
 
 10 chequeos nuevos (312 en 8 suites). sw `v43`.
+
+### Límite de cuota gratuita y errores legibles — 2026-08-15
+
+**No es un bug del código**: Gemini devolvió `429 RESOURCE_EXHAUSTED`
+(`generate_content_free_tier_requests`, limit 20). Es el plan gratuito
+funcionando como corresponde. Sí eran defectos las dos formas en que la
+app lo comunicaba.
+
+**1. Se imprimía el volcado del error HTTP completo.** JSON anidado, links
+a documentación, nombres de métrica de cuota — ocupaba la pantalla entera
+y no decía lo único que importa: si es culpa del usuario, si se arregla
+solo, y qué puede hacer mientras tanto. Nuevo
+`AIProvider.traducirError(e)`, aplicado en `invocarGemini` para que valga
+igual en recetas y en visión:
+
+| Error | Mensaje |
+|---|---|
+| 429 con tiempo | «Se llegó al límite de uso gratuito del modelo. Probá de nuevo en 9 segundos.» |
+| 429 sin tiempo | «Se agotó la cuota gratuita… El recetario sigue funcionando sin el modelo.» |
+| 5xx | «El modelo está sobrecargado. Probá de nuevo en un minuto.» |
+| 401/403 | «Rechazó la credencial. Revisá Preferencias → IA en la nube.» |
+| Sin red | «No se pudo conectar… El recetario funciona igual sin internet.» |
+
+El detalle completo sigue yendo a la consola, que es donde sirve. El orden
+de los chequeos importa: el mensaje de cuota incluye la palabra "API" y un
+link, así que el chequeo de credenciales tiene que ir después del de cuota
+o se lo queda él.
+
+**2. El encabezado mentía.** Decía «No salió ninguna receta que pase los
+controles» aunque el modelo no hubiera contestado nunca — mandaba al
+usuario a buscar un problema en su despensa que no existía. Ahora
+`generar`/`generarParaVencer` marcan `fallaDelModelo: true` cuando el
+motor falla, y la UI distingue los dos casos (`motivoGeneracion` en
+main.js, más los dos handlers de "Para lo que se vence ahora").
+
+**Nota para la defensa**: este incidente es evidencia directa de por qué
+la arquitectura en dos capas no es decorativa. Con la cuota agotada, el
+recetario fijo siguió respondiendo sin conexión y sin modelo. Es el "piso
+garantizado" haciendo exactamente lo que promete.
+
+11 chequeos nuevos (323 en 8 suites). sw `v44`.
