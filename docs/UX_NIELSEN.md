@@ -40,12 +40,59 @@ Sí, con una salvedad. El flujo principal (escanear, ver alertas, cocinar con lo
 Sí. Los mensajes de estado están escritos en primera persona y en tono conversacional ("Sigo buscándolo", "No encontré la fecha. Probá más cerca y con más luz"), evitando jerga de sistema ("error 404", "timeout"). Las categorías, ubicaciones y unidades son las de una cocina real.
 
 **¿Se hizo alguna prueba con un usuario real? ¿Qué feedback se obtuvo?**
-*(Sección pendiente de completar por el equipo — ver nota abajo.)*
 
-> **Nota para completar antes de entregar**: la consigna pide evidencia de
-> al menos una prueba informal con una persona que no haya visto la app
-> antes (no hace falta que sea del rubro gastronómico). Sugerencia
-> concreta: pedirle a alguien de tu casa que cargue un producto real desde
-> cero, sin indicaciones previas, y anotar dónde se traba o qué no
-> entiende. Documentarlo acá con honestidad — vale más una prueba real con
-> un problema encontrado que ninguna prueba.
+Sí. Prueba informal el **16/08/2026** con una persona que no había visto la
+app antes, sobre la versión publicada y en su propio teléfono, sin
+indicaciones previas ni acompañamiento durante el uso.
+
+### Lo que funcionó
+
+| Pantalla | Observación del usuario |
+|---|---|
+| **Inicio** | El código de colores del semáforo (vencidos, por vencer, en stock) le resultó **intuitivo sin explicación**: entendió el estado de la despensa "de un vistazo". Valoró que la lista muestre el contador de días restantes por producto. |
+| **Alta de productos** | Identificó las tres vías de carga (OCR de la fecha, código de barras, manual) y las leyó como **flexibilidad**, no como complejidad: "según la preferencia o comodidad". |
+| **Recetas** | Entendió que la sugerencia se arma con el inventario real, y destacó que las recetas **marquen con claridad los ingredientes que faltan comprar**. |
+
+Los tres puntos corresponden a heurísticas evaluadas arriba —#1
+visibilidad del estado, #7 flexibilidad y eficiencia, #6 reconocer antes que
+recordar— y se cumplieron **sin intervención del evaluador**, que es la única
+forma de verificarlas de verdad.
+
+### Lo que propuso: favoritos + lista de compras derivada
+
+El usuario no encontró un obstáculo de uso, pero propuso una funcionalidad
+concreta: **marcar recetas como favoritas** (ícono de corazón) y, a partir de
+las favoritas guardadas, **generar automáticamente la lista de compras** con
+lo que falta para prepararlas.
+
+**Es una propuesta buena y revela un hueco real.** Hoy el sistema tiene una
+señal negativa explícita —descartar una receta la saca del listado— pero la
+única señal positiva explícita es *cocinarla*, que exige efectivamente
+cocinar. Un favorito permitiría decir "esta me gusta" antes de tener los
+ingredientes, que es justamente cuando el dato sirve para decidir la compra.
+
+**Y trae una tensión de diseño que hay que nombrar, no esconder.** La tesis
+de la app es *cocinar lo que está por vencer y comprar menos*. Una lista de
+compras derivada de recetas deseadas empuja en la dirección contraria:
+comprar más. Hoy `AgenteCompras.queComprar` evita ese problema con dos
+restricciones —sólo propone comprar para recetas a las que les faltan **como
+máximo 2** ingredientes, y sólo si esa receta **rescata algo que está por
+vencer**—. Sumar favoritos obliga a decidir si esa segunda restricción se
+relaja, y relajarla cambia el carácter del producto.
+
+**Resolución propuesta**: implementar favoritos como señal de aprendizaje
+(entrada positiva explícita para `AgenteAprendizaje`) y mantener la lista de
+compras subordinada al rescate: los favoritos **ordenan** las sugerencias de
+compra, pero no habilitan comprar para una receta que no rescata nada. Así se
+incorpora el aporte del usuario sin contradecir el objetivo del sistema.
+
+### Honestidad sobre el alcance de esta prueba
+
+Una sola sesión con una sola persona, sin obstáculos encontrados, es
+evidencia **limitada**. No prueba que la app sea fácil de usar: prueba que
+este usuario, en esta sesión, no se trabó. Una segunda ronda debería buscar
+específicamente lo que esta no cubrió: qué pasa cuando el OCR falla dos veces
+seguidas, si el usuario entiende la diferencia entre *eliminar* y *descartar*
+—que es conceptualmente sutil y afecta las métricas—, y si encuentra la
+opción de leer la fecha con IA sin que se la señalen (la falla ya
+identificada en la heurística #8).

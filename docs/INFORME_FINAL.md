@@ -231,9 +231,40 @@ agregar la información correcta con la promesa correcta.
 
 ### Prueba con usuario real
 
-> **A completar antes de entregar**: documentar acá la prueba informal con una
-> persona que no haya visto la app antes. Vale más una prueba real con un
-> problema encontrado que ninguna prueba.
+Prueba informal el **16/08/2026** con una persona que no había visto la app
+antes, en su propio teléfono, sin indicaciones ni acompañamiento. Detalle
+completo en el Anexo `UX_NIELSEN.md`, sección 5.2.
+
+**Lo que se verificó sin intervención del evaluador**: entendió el semáforo
+de colores sin explicación, identificó las tres vías de carga y las leyó como
+flexibilidad —no como complejidad—, y comprendió que las recetas se arman con
+el inventario real, destacando que se marquen los ingredientes faltantes.
+
+**Lo que propuso**: marcar recetas como favoritas y derivar de ellas la lista
+de compras.
+
+**Por qué la propuesta importa.** Revela un hueco real: hoy el sistema tiene
+una señal negativa explícita —descartar una receta— pero la única señal
+positiva explícita es cocinarla, lo que exige efectivamente cocinar. Un
+favorito permitiría decir "esta me gusta" antes de tener los ingredientes,
+que es justo cuando el dato sirve para decidir la compra.
+
+**Y trae una tensión que conviene nombrar.** La tesis de la app es cocinar lo
+que está por vencer y **comprar menos**; una lista derivada de recetas
+deseadas empuja a comprar más. Hoy el Agente de Compras evita eso con dos
+restricciones: sólo propone comprar para recetas a las que faltan como máximo
+dos ingredientes, y sólo si la receta rescata algo en riesgo. La resolución
+propuesta es implementar favoritos como **señal de aprendizaje** y mantener la
+lista de compras subordinada al rescate: los favoritos ordenan las
+sugerencias, pero no habilitan comprar para una receta que no rescata nada.
+
+**Alcance honesto**: una sesión con una persona y sin obstáculos encontrados
+es evidencia limitada. No prueba que la app sea fácil de usar; prueba que este
+usuario, en esta sesión, no se trabó. Una segunda ronda debería buscar lo que
+ésta no cubrió: el comportamiento tras dos fallos seguidos del OCR, si se
+entiende la diferencia entre *eliminar* y *descartar* —conceptualmente sutil y
+con efecto sobre las métricas—, y si el usuario encuentra "Leer con IA" sin
+que se la señalen, que es la falla ya identificada en la heurística 8.
 
 ### Cuánto aprende el sistema, medido
 
@@ -361,6 +392,12 @@ la **disponibilidad** ("¿tengo carne?") pero pierde el detalle. Notablemente,
 la capa generativa **no** tiene este problema: al modelo se le entrega el
 nombre real del producto, así que sabe qué es un asado. Es la demostración
 concreta de por qué existen las dos capas.
+
+**No hay señal positiva explícita sobre una receta.** Descartar una receta es
+una acción disponible; marcarla como deseada, no. La única forma de decirle al
+sistema que algo gusta es cocinarlo. Es el hueco que detectó la prueba con
+usuario (Sección 5) y la mejora de mayor valor por esfuerzo que queda
+pendiente.
 
 **El inventario cuenta unidades, no peso.** Cada producto tiene una cantidad
 entera, y cocinar una receta descuenta una unidad. Para un paquete de fideos o
