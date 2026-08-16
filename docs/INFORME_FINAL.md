@@ -135,10 +135,35 @@ real, no una molestia.
 
 ## 4. Evidencia de funcionamiento
 
-> **A completar antes de entregar**: insertar acá las capturas de
-> `docs/capturas/` (mínimo 3: pantalla principal, flujo de captura, output de
-> la IA) y adjuntar `log-sesion-real.json`, exportado desde
-> *Perfil → Copia de seguridad → Exportar mis datos*.
+Doce capturas tomadas el 16/08/2026 desde un teléfono Android real, sobre la
+app publicada en HTTPS y con datos cargados por el usuario. El índice completo
+está en [`docs/capturas/README.md`](../docs/capturas/README.md). Las que
+sostienen la evaluación:
+
+| Captura | Qué demuestra |
+|---|---|
+| `captura 2` | **Inicio** con estado real: productos por vencer, recetas disponibles, resumen por categoría |
+| `captura 5` + `captura 6` | **El flujo principal, y la arquitectura en dos capas en dos imágenes**: el OCR local no logra leer una fecha impresa sobre plástico arrugado, lo dice sin inventar nada y ofrece el respaldo de visión detrás de un botón explícito; la siguiente muestra los tres pasos resueltos |
+| `captura 9` | **Priorización por urgencia**: *"Rescata lo más urgente: Milanesa"* |
+| `captura 10` | **Receta generada** con la etiqueta `inventada`, pasos completos y el aviso de que pasó los mismos controles que las del recetario |
+| `captura 11` | *"Se hace con milanesa que se te vence y papa frita que tenés en la alacena. Te falta…"* — el sistema dice qué hay en casa, **dónde**, y qué falta comprar |
+| `captura 12` | **Sistema**: ciclo de orquestación y log en vivo de los agentes |
+
+**Log de sesión real**: `docs/capturas/despensa-inteligente-2026-08-16.json`,
+exportación completa de la memoria del sistema desde *Perfil → Copia de
+seguridad*. No es una captura: es el estado real de todos los almacenes.
+
+Dos detalles que un evaluador atento puede verificar en las imágenes:
+
+- En `captura 10`, entre los ingredientes de la receta generada aparece
+  *"mayonesa hellmanns clasica"*. Ese producto expuso un defecto real del
+  validador el 15/08 —rechazaba la respuesta correcta del modelo por una
+  diferencia de apóstrofo entre el prompt saneado y la lista cerrada—
+  documentado en `CONTEXTO.md`. La captura es la verificación en producción
+  de que el arreglo funciona.
+- En `captura 9`, *"Arroz guisado con asado desmenuzado"* **no** es una de las
+  27 recetas escritas a mano: es una receta generada por el modelo, validada e
+  incorporada al catálogo, conviviendo con las fijas.
 
 ### Qué es real y qué no
 

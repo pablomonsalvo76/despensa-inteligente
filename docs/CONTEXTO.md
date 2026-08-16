@@ -844,3 +844,38 @@ se perdía al cambiar de teléfono. Es *el mismo olvido* que ya se había
 cometido con `stylePreferences`. Corregido en `exportAll` e `importAll`.
 
 11 chequeos nuevos (335 en 8 suites). sw `v46`.
+
+### La receta generada era un callejón sin salida — 2026-08-16
+
+**Reportado por el autor**: la receta inventada no deja marcar si la
+cocinaste o la descartaste.
+
+**Por qué importa más de lo que parece.** El desenlace no es un detalle de
+interfaz: es la **única** entrada del Agente de Aprendizaje. Sin él,
+`stylePreferences` no suma ni resta afinidad, y `avoidedIngredients` no
+cuenta el rechazo. El modelo podía proponer diez platos y el sistema seguía
+sin aprender nada del usuario — justo en la capa que se supone más
+inteligente.
+
+**Causa.** El panel "Inventar una receta" (`sc-recetas`) dibujaba la receta
+como HTML plano: título, etiqueta `inventada` y pasos. No había forma de
+abrirla. La pantalla de detalle (`sc-receta`) sí tiene los botones
+`rd-cook` / `rd-dismiss`, que llaman a `AgenteEvaluador.registrarDesenlace`
+—y de ahí sale todo: descartar la saca del listado vía
+`AgenteCocinero.descartarReceta`, y cocinar descuenta los ingredientes de
+la despensa—. Simplemente no se llegaba a esa pantalla.
+
+**Solución**: un botón por receta que abre el detalle de siempre, con
+`candidataDesdeGenerada`. La receta inventada se trata igual que una del
+recetario, que es exactamente lo que es una vez que pasó el validador.
+
+**Efecto colateral que sólo funciona gracias al recetario que crece**: al
+cocinar una receta generada, `descontarIngredientesDeReceta` la busca con
+`buscarReceta(id)`. Antes de persistir lo generado esa búsqueda fallaba en
+silencio y no descontaba nada. Ahora descuenta bien.
+
+También se corrigió que `pan_rallado` se mostrara con guion bajo en el
+aviso "Te falta:" — es una clave interna, no un texto para el usuario.
+Apareció en una de las capturas de la entrega.
+
+sw `v47`.

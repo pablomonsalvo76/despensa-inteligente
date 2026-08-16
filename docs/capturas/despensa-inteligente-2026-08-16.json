@@ -1,0 +1,1653 @@
+{
+  "_app": "despensa-inteligente",
+  "_version": 1,
+  "_exportedAt": "2026-08-16T21:08:47.224Z",
+  "products": [
+    {
+      "id": "1785467286860_qsqafcl",
+      "name": "Nalga milanesa",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-03",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-07-31",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-07"
+    },
+    {
+      "id": "1785467301758_jf9qxsi",
+      "name": "Papa",
+      "category": "verduras",
+      "quantity": 1,
+      "expiryDate": "2026-08-07",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-07-31",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-07"
+    },
+    {
+      "id": "1785467557848_x8vtsy6",
+      "name": "Arroz",
+      "category": "cereales",
+      "quantity": 1,
+      "expiryDate": "2026-07-31",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-07-31",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-07"
+    },
+    {
+      "id": "1785467943115_y27y307",
+      "name": "Asado",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-03",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-07-31",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-07"
+    },
+    {
+      "id": "1785467967097_vsv06e1",
+      "name": "Carne",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-03",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-07-31",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-07"
+    },
+    {
+      "id": "1786072549778_3hn9a73",
+      "name": "Asado",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-10",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-08-07",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-15"
+    },
+    {
+      "id": "1786072568866_58kvsjc",
+      "name": "Lenteja",
+      "category": "cereales",
+      "quantity": 1,
+      "expiryDate": "2026-08-08",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-08-07",
+      "status": "descartado",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-15"
+    },
+    {
+      "id": "1786113277725_2cvj9xr",
+      "name": "Mayonesa Hellmann's Clásica",
+      "category": "otros",
+      "quantity": 1,
+      "expiryDate": "2027-01-23",
+      "source": "scan",
+      "location": "Heladera",
+      "addedDate": "2026-08-07",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786113794359_4osv0rh",
+      "name": "Mayonesa Hellmann's Clásica",
+      "category": "otros",
+      "quantity": 1,
+      "expiryDate": "2027-01-23",
+      "source": "scan",
+      "location": "Heladera",
+      "addedDate": "2026-08-07",
+      "status": "consumido",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-15"
+    },
+    {
+      "id": "1786807337363_eqlarak",
+      "name": "Alfajores Capitán del Espacio",
+      "category": "otros",
+      "quantity": 1,
+      "expiryDate": "2026-10-03",
+      "source": "manual",
+      "location": "Alacena",
+      "addedDate": "2026-08-15",
+      "status": "consumido",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-15"
+    },
+    {
+      "id": "1786812357363_nrgzo7c",
+      "name": "Alfajor Capitán Del Espacio",
+      "category": "otros",
+      "quantity": 1,
+      "expiryDate": "2026-10-03",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-08-15",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786813973244_324vog4",
+      "name": "Arroz",
+      "category": "cereales",
+      "quantity": 1,
+      "expiryDate": "2026-10-31",
+      "source": "manual",
+      "location": "Alacena",
+      "addedDate": "2026-08-15",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786813998237_74azive",
+      "name": "Milanesa",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-18",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-08-15",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786814024537_z4otwsc",
+      "name": "Pure de tomate",
+      "category": "conservas",
+      "quantity": 1,
+      "expiryDate": "2027-02-25",
+      "source": "manual",
+      "location": "Alacena",
+      "addedDate": "2026-08-15",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786814171435_4hlzhmf",
+      "name": "Carne",
+      "category": "carnes",
+      "quantity": 1,
+      "expiryDate": "2026-08-18",
+      "source": "manual",
+      "location": "Freezer",
+      "addedDate": "2026-08-15",
+      "status": "consumido",
+      "perishable": true,
+      "value": 1,
+      "resolvedDate": "2026-08-15"
+    },
+    {
+      "id": "1786825674998_xxj7ycs",
+      "name": "Asado",
+      "category": "carnes",
+      "quantity": 2,
+      "expiryDate": "2026-08-16",
+      "source": "manual",
+      "location": "Heladera",
+      "addedDate": "2026-08-15",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    },
+    {
+      "id": "1786914411088_7y1z46t",
+      "name": "Papa Frita",
+      "category": "otros",
+      "quantity": 1,
+      "expiryDate": "2026-09-17",
+      "source": "scan",
+      "location": "Alacena",
+      "addedDate": "2026-08-16",
+      "status": "activo",
+      "perishable": true,
+      "value": 1
+    }
+  ],
+  "history": [
+    {
+      "id": "1786072033017_nq1n9jd",
+      "productId": "1785467557848_x8vtsy6",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-07T03:07:13.017Z"
+    },
+    {
+      "id": "1786072033701_dcejyg5",
+      "productId": "1785467286860_qsqafcl",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-07T03:07:13.701Z"
+    },
+    {
+      "id": "1786072034248_dyzitzy",
+      "productId": "1785467943115_y27y307",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-07T03:07:14.248Z"
+    },
+    {
+      "id": "1786072034428_g48xqi9",
+      "productId": "1785467967097_vsv06e1",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-07T03:07:14.428Z"
+    },
+    {
+      "id": "1786072034618_1qs53jm",
+      "productId": "1785467301758_jf9qxsi",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-07T03:07:14.618Z"
+    },
+    {
+      "id": "1786807700490_h2hfq4v",
+      "productId": "1786807337363_eqlarak",
+      "recipeId": null,
+      "outcome": "cocinado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-15T15:28:20.490Z"
+    },
+    {
+      "id": "1786813120179_3t2axxo",
+      "productId": "1786113794359_4osv0rh",
+      "recipeId": null,
+      "outcome": "cocinado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-15T16:58:40.179Z"
+    },
+    {
+      "id": "1786813942670_ox4ks4i",
+      "productId": "1786072549778_3hn9a73",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-15T17:12:22.670Z"
+    },
+    {
+      "id": "1786813943358_ymzsb81",
+      "productId": "1786072568866_58kvsjc",
+      "recipeId": null,
+      "outcome": "descartado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-15T17:12:23.358Z"
+    },
+    {
+      "id": "1786814260860_79bwxo7",
+      "productId": "1786814171435_4hlzhmf",
+      "recipeId": null,
+      "outcome": "cocinado",
+      "ingredientesUsados": [],
+      "timestamp": "2026-08-15T17:17:40.860Z"
+    }
+  ],
+  "preferences": {
+    "allergies": [],
+    "dietary": [],
+    "avoidedIngredients": {},
+    "alertThresholds": {
+      "default": {
+        "yellow": 3,
+        "red": 1
+      },
+      "otros": {
+        "yellow": 3,
+        "red": 1,
+        "learned": true
+      }
+    },
+    "maxSuggestions": 3,
+    "ocrMinConfidence": 0.6
+  },
+  "consumptionPatterns": {
+    "otros": {
+      "promedioDias": 4,
+      "muestras": 2
+    },
+    "carnes": {
+      "promedioDias": 0,
+      "muestras": 1
+    }
+  },
+  "gtinCache": {
+    "7794000006058": {
+      "name": "Mayonesa Hellmann's Clásica",
+      "category": "otros"
+    },
+    "7792931000039": {
+      "name": "Glaciar Agua",
+      "category": "otros"
+    },
+    "7798312320512": {
+      "name": "Dulce de leche",
+      "category": "otros"
+    },
+    "7798039910072": {
+      "name": "Alfajores Por Tres",
+      "category": "otros"
+    },
+    "7794520869300": {
+      "name": "Papa Frita",
+      "category": "otros"
+    }
+  },
+  "dismissedRecipes": [],
+  "profile": {
+    "name": "Pablo",
+    "email": ""
+  },
+  "household": [],
+  "shoppingState": {
+    "comprados": [],
+    "ignorados": []
+  },
+  "notificationState": {},
+  "systemLog": [
+    {
+      "id": "1786815730915_5fujs90",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:42:10.915Z"
+    },
+    {
+      "id": "1786815730918_6e29d3t",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:42:10.918Z"
+    },
+    {
+      "id": "1786815730919_hi0tg3p",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:42:10.919Z"
+    },
+    {
+      "id": "1786815730921_xmzstrz",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:42:10.921Z"
+    },
+    {
+      "id": "1786815730926_tspk0to",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:42:10.926Z"
+    },
+    {
+      "id": "1786815730929_qdrp2x8",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:42:10.929Z"
+    },
+    {
+      "id": "1786815790946_fjj0q9m",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:43:10.946Z"
+    },
+    {
+      "id": "1786815790948_r07dusu",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:43:10.948Z"
+    },
+    {
+      "id": "1786815790950_k95tvpa",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:43:10.950Z"
+    },
+    {
+      "id": "1786815790951_17diqju",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:43:10.951Z"
+    },
+    {
+      "id": "1786815790962_fx5qdev",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:43:10.962Z"
+    },
+    {
+      "id": "1786815790964_0lxel8g",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:43:10.964Z"
+    },
+    {
+      "id": "1786816103712_iecgzgc",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:48:23.712Z"
+    },
+    {
+      "id": "1786816103716_5l7udhu",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:48:23.716Z"
+    },
+    {
+      "id": "1786816103717_p22rr4z",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:48:23.717Z"
+    },
+    {
+      "id": "1786816103722_a16p5g9",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:48:23.722Z"
+    },
+    {
+      "id": "1786816103731_ror257m",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:48:23.731Z"
+    },
+    {
+      "id": "1786816103732_lhfqawp",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:48:23.732Z"
+    },
+    {
+      "id": "1786816113906_b6oayj9",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:48:33.906Z"
+    },
+    {
+      "id": "1786816113908_8dybwvw",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:48:33.908Z"
+    },
+    {
+      "id": "1786816113912_lmq9lv1",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:48:33.912Z"
+    },
+    {
+      "id": "1786816113913_3dk9ir3",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:48:33.913Z"
+    },
+    {
+      "id": "1786816113920_3luiw1l",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:48:33.920Z"
+    },
+    {
+      "id": "1786816113921_0mwpirg",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:48:33.921Z"
+    },
+    {
+      "id": "1786816126615_6gxb9s8",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:48:46.615Z"
+    },
+    {
+      "id": "1786816126618_j8dhg6o",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:48:46.618Z"
+    },
+    {
+      "id": "1786816126619_d1073ha",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:48:46.619Z"
+    },
+    {
+      "id": "1786816126623_wf6am24",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:48:46.623Z"
+    },
+    {
+      "id": "1786816126627_ctb1vny",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:48:46.627Z"
+    },
+    {
+      "id": "1786816126629_b0i074p",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:48:46.629Z"
+    },
+    {
+      "id": "1786816187404_hge1j77",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:49:47.405Z"
+    },
+    {
+      "id": "1786816187418_h66msy7",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:49:47.418Z"
+    },
+    {
+      "id": "1786816187425_xx0dr6d",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:49:47.425Z"
+    },
+    {
+      "id": "1786816187430_fgxioqv",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:49:47.430Z"
+    },
+    {
+      "id": "1786816187442_n4ks2h0",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:49:47.442Z"
+    },
+    {
+      "id": "1786816187444_45fhk7v",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:49:47.444Z"
+    },
+    {
+      "id": "1786816611021_5ilvwdm",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T17:56:51.022Z"
+    },
+    {
+      "id": "1786816611048_xhhxxa6",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T17:56:51.048Z"
+    },
+    {
+      "id": "1786816611054_pi0ckv4",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T17:56:51.054Z"
+    },
+    {
+      "id": "1786816611059_l4ftr07",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T17:56:51.059Z"
+    },
+    {
+      "id": "1786816611067_dy0tgu9",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T17:56:51.067Z"
+    },
+    {
+      "id": "1786816611069_tpn9unt",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T17:56:51.069Z"
+    },
+    {
+      "id": "1786816883543_4booa3l",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:01:23.543Z"
+    },
+    {
+      "id": "1786816883547_91zx8n4",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:01:23.547Z"
+    },
+    {
+      "id": "1786816883549_knippsv",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:01:23.549Z"
+    },
+    {
+      "id": "1786816883555_g7d0uqu",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:01:23.555Z"
+    },
+    {
+      "id": "1786816883566_f0f383h",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:01:23.566Z"
+    },
+    {
+      "id": "1786816883567_j1ihcg4",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:01:23.567Z"
+    },
+    {
+      "id": "1786817016694_zaz8sq9",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:03:36.694Z"
+    },
+    {
+      "id": "1786817016701_bcv9rcn",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:03:36.701Z"
+    },
+    {
+      "id": "1786817016703_z4jucnj",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:03:36.703Z"
+    },
+    {
+      "id": "1786817016711_6n2nuav",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:03:36.711Z"
+    },
+    {
+      "id": "1786817016722_uzw287i",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:03:36.722Z"
+    },
+    {
+      "id": "1786817016723_rvkqldo",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:03:36.723Z"
+    },
+    {
+      "id": "1786817049240_e6dg15s",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:04:09.240Z"
+    },
+    {
+      "id": "1786817049243_qiflpjl",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:04:09.243Z"
+    },
+    {
+      "id": "1786817049245_clabod8",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:04:09.245Z"
+    },
+    {
+      "id": "1786817049249_x90umdn",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:04:09.249Z"
+    },
+    {
+      "id": "1786817049258_1cvfp0d",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:04:09.258Z"
+    },
+    {
+      "id": "1786817049258_lxcyjfz",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:04:09.258Z"
+    },
+    {
+      "id": "1786817816009_1js5w8h",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:16:56.009Z"
+    },
+    {
+      "id": "1786817816017_ckas2eb",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:16:56.017Z"
+    },
+    {
+      "id": "1786817816018_dd3u8zm",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:16:56.018Z"
+    },
+    {
+      "id": "1786817816019_vssxpum",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:16:56.019Z"
+    },
+    {
+      "id": "1786817816034_ilbapb5",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:16:56.034Z"
+    },
+    {
+      "id": "1786817816036_04uazxj",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:16:56.036Z"
+    },
+    {
+      "id": "1786817878220_9qa9g6q",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:17:58.220Z"
+    },
+    {
+      "id": "1786817878225_8pkp71y",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:17:58.225Z"
+    },
+    {
+      "id": "1786817878226_arfyv79",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:17:58.226Z"
+    },
+    {
+      "id": "1786817878227_8d06kj3",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:17:58.227Z"
+    },
+    {
+      "id": "1786817878244_r6byvc2",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:17:58.244Z"
+    },
+    {
+      "id": "1786817878244_ools7wo",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:17:58.244Z"
+    },
+    {
+      "id": "1786817938283_2iyofm1",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:18:58.284Z"
+    },
+    {
+      "id": "1786817938288_4cnjnfv",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:18:58.288Z"
+    },
+    {
+      "id": "1786817938292_yj6c7uq",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:18:58.292Z"
+    },
+    {
+      "id": "1786817938295_8ae1gfx",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:18:58.295Z"
+    },
+    {
+      "id": "1786817938304_fl39p1q",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:18:58.304Z"
+    },
+    {
+      "id": "1786817938305_ns6ofvx",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:18:58.305Z"
+    },
+    {
+      "id": "1786817998395_vjdny3k",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T18:19:58.395Z"
+    },
+    {
+      "id": "1786817998409_tb2x0bb",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T18:19:58.409Z"
+    },
+    {
+      "id": "1786817998411_jbeznow",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T18:19:58.411Z"
+    },
+    {
+      "id": "1786817998413_2hft5jj",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T18:19:58.413Z"
+    },
+    {
+      "id": "1786817998431_rwuy8um",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T18:19:58.431Z"
+    },
+    {
+      "id": "1786817998433_1rahvhi",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T18:19:58.433Z"
+    },
+    {
+      "id": "1786825596737_h3y6qj6",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:26:36.742Z"
+    },
+    {
+      "id": "1786825596767_v3f1p0g",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T20:26:36.768Z"
+    },
+    {
+      "id": "1786825596769_97b1hy5",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:26:36.769Z"
+    },
+    {
+      "id": "1786825596775_chqe4er",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:26:36.775Z"
+    },
+    {
+      "id": "1786825596820_1zjbmd5",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:26:36.820Z"
+    },
+    {
+      "id": "1786825596821_ewbf8rf",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:26:36.821Z"
+    },
+    {
+      "id": "1786825656917_zs9mowg",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:27:36.917Z"
+    },
+    {
+      "id": "1786825656932_fpcgw79",
+      "paso": "Análisis",
+      "detalle": "5 productos activos analizados.",
+      "timestamp": "2026-08-15T20:27:36.932Z"
+    },
+    {
+      "id": "1786825656938_chsd000",
+      "paso": "Análisis",
+      "detalle": "1 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:27:36.938Z"
+    },
+    {
+      "id": "1786825656942_3ge1cqk",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:27:36.942Z"
+    },
+    {
+      "id": "1786825656951_kyxrwl9",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:27:36.951Z"
+    },
+    {
+      "id": "1786825656952_tlnnvuo",
+      "paso": "Acción",
+      "detalle": "1 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:27:36.952Z"
+    },
+    {
+      "id": "1786825674999_l9cqvpy",
+      "paso": "Comunicación",
+      "detalle": "Inventario → Orquestador: producto_agregado (Asado).",
+      "timestamp": "2026-08-15T20:27:54.999Z"
+    },
+    {
+      "id": "1786825675005_ot0ts1z",
+      "paso": "Observación",
+      "detalle": "Disparado por: nuevo producto. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:27:55.005Z"
+    },
+    {
+      "id": "1786825675007_ed8o6r8",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:27:55.007Z"
+    },
+    {
+      "id": "1786825675009_tfe7avn",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:27:55.009Z"
+    },
+    {
+      "id": "1786825675013_26ci51r",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:27:55.013Z"
+    },
+    {
+      "id": "1786825675016_m6tfg8q",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:27:55.016Z"
+    },
+    {
+      "id": "1786825675017_mnrbhfx",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:27:55.017Z"
+    },
+    {
+      "id": "1786825682581_8bbwfcc",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:28:02.582Z"
+    },
+    {
+      "id": "1786825682583_v8wnvjn",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:28:02.583Z"
+    },
+    {
+      "id": "1786825682585_6xqx5k9",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:28:02.585Z"
+    },
+    {
+      "id": "1786825682585_mlzg6qi",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:28:02.585Z"
+    },
+    {
+      "id": "1786825682595_zas4ga7",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:28:02.595Z"
+    },
+    {
+      "id": "1786825682596_jffl3h2",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:28:02.596Z"
+    },
+    {
+      "id": "1786825689956_gb55g75",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:28:09.956Z"
+    },
+    {
+      "id": "1786825689962_jrb8yvv",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:28:09.962Z"
+    },
+    {
+      "id": "1786825689963_6tou6zk",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:28:09.963Z"
+    },
+    {
+      "id": "1786825689964_aeo0twm",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:28:09.964Z"
+    },
+    {
+      "id": "1786825689982_qptabga",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:28:09.982Z"
+    },
+    {
+      "id": "1786825689984_lygwu4e",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:28:09.984Z"
+    },
+    {
+      "id": "1786825750489_kt7whu2",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:29:10.489Z"
+    },
+    {
+      "id": "1786825750494_mj4k9jl",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:29:10.494Z"
+    },
+    {
+      "id": "1786825750499_cffjhyz",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:29:10.499Z"
+    },
+    {
+      "id": "1786825750503_28t5flj",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:29:10.503Z"
+    },
+    {
+      "id": "1786825750515_c81a7sa",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:29:10.515Z"
+    },
+    {
+      "id": "1786825750517_yj1f98k",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:29:10.517Z"
+    },
+    {
+      "id": "1786826215526_its7xca",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:36:55.535Z"
+    },
+    {
+      "id": "1786826215562_4umnynz",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:36:55.562Z"
+    },
+    {
+      "id": "1786826215563_jus49sq",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:36:55.563Z"
+    },
+    {
+      "id": "1786826215570_w6p5p8a",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:36:55.570Z"
+    },
+    {
+      "id": "1786826215608_8yundtr",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:36:55.609Z"
+    },
+    {
+      "id": "1786826215618_d8jj4qd",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:36:55.618Z"
+    },
+    {
+      "id": "1786826241144_ax5u7u5",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T20:37:21.144Z"
+    },
+    {
+      "id": "1786826241149_prxdro9",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T20:37:21.149Z"
+    },
+    {
+      "id": "1786826241151_ayhvwcr",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T20:37:21.151Z"
+    },
+    {
+      "id": "1786826241155_ib48afn",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T20:37:21.155Z"
+    },
+    {
+      "id": "1786826241168_wdane0f",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T20:37:21.168Z"
+    },
+    {
+      "id": "1786826241170_d7rg9hc",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T20:37:21.170Z"
+    },
+    {
+      "id": "1786833103491_vlu79kb",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T22:31:43.491Z"
+    },
+    {
+      "id": "1786833103497_ryxnr3c",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T22:31:43.497Z"
+    },
+    {
+      "id": "1786833103500_6w326tp",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T22:31:43.500Z"
+    },
+    {
+      "id": "1786833103505_uqf4sfc",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T22:31:43.505Z"
+    },
+    {
+      "id": "1786833103518_frl77sv",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T22:31:43.518Z"
+    },
+    {
+      "id": "1786833103519_2e5dj2e",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T22:31:43.519Z"
+    },
+    {
+      "id": "1786833163566_cxs9ijz",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T22:32:43.566Z"
+    },
+    {
+      "id": "1786833163579_xi6o3d5",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T22:32:43.579Z"
+    },
+    {
+      "id": "1786833163583_w3qakgx",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T22:32:43.583Z"
+    },
+    {
+      "id": "1786833163585_umx7iuq",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T22:32:43.585Z"
+    },
+    {
+      "id": "1786833163610_zdc3vks",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T22:32:43.610Z"
+    },
+    {
+      "id": "1786833163613_dpcplbl",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T22:32:43.613Z"
+    },
+    {
+      "id": "1786833224439_9qlmzaq",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T22:33:44.439Z"
+    },
+    {
+      "id": "1786833224497_3j7z6pm",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T22:33:44.497Z"
+    },
+    {
+      "id": "1786833224516_mhzvwcr",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T22:33:44.517Z"
+    },
+    {
+      "id": "1786833224521_etjmnau",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T22:33:44.521Z"
+    },
+    {
+      "id": "1786833224583_9ogyf6q",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T22:33:44.583Z"
+    },
+    {
+      "id": "1786833224589_3okzyvb",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T22:33:44.589Z"
+    },
+    {
+      "id": "1786834341480_c9ifvr8",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-15T22:52:21.482Z"
+    },
+    {
+      "id": "1786834341495_76zgz8w",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-15T22:52:21.495Z"
+    },
+    {
+      "id": "1786834341497_apqq6me",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-15T22:52:21.497Z"
+    },
+    {
+      "id": "1786834341502_5u9do9n",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-15T22:52:21.502Z"
+    },
+    {
+      "id": "1786834341515_eaoyvvi",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-15T22:52:21.515Z"
+    },
+    {
+      "id": "1786834341520_bdytzcu",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-15T22:52:21.520Z"
+    },
+    {
+      "id": "1786914269752_16ic4i8",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:04:29.753Z"
+    },
+    {
+      "id": "1786914269781_m7vtozg",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-16T21:04:29.781Z"
+    },
+    {
+      "id": "1786914269783_nr1u2ei",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:04:29.783Z"
+    },
+    {
+      "id": "1786914269797_fxxdeyw",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:04:29.797Z"
+    },
+    {
+      "id": "1786914269819_ushdqr0",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:04:29.819Z"
+    },
+    {
+      "id": "1786914269830_ldh873l",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:04:29.830Z"
+    },
+    {
+      "id": "1786914299604_6gboz9g",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:04:59.606Z"
+    },
+    {
+      "id": "1786914299615_392whrk",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-16T21:04:59.615Z"
+    },
+    {
+      "id": "1786914299617_uzecjzm",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:04:59.617Z"
+    },
+    {
+      "id": "1786914299618_jb7i23c",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:04:59.618Z"
+    },
+    {
+      "id": "1786914299633_xnfvdm3",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:04:59.633Z"
+    },
+    {
+      "id": "1786914299634_95aqtok",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:04:59.634Z"
+    },
+    {
+      "id": "1786914359670_uvel6nd",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:05:59.670Z"
+    },
+    {
+      "id": "1786914359677_b0ei076",
+      "paso": "Análisis",
+      "detalle": "6 productos activos analizados.",
+      "timestamp": "2026-08-16T21:05:59.677Z"
+    },
+    {
+      "id": "1786914359677_ilkhxsv",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:05:59.677Z"
+    },
+    {
+      "id": "1786914359678_dtznty2",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:05:59.678Z"
+    },
+    {
+      "id": "1786914359689_ukeayrw",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:05:59.689Z"
+    },
+    {
+      "id": "1786914359695_zmw7lqx",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:05:59.695Z"
+    },
+    {
+      "id": "1786914411089_hqck793",
+      "paso": "Comunicación",
+      "detalle": "Inventario → Orquestador: producto_agregado (Papa Frita).",
+      "timestamp": "2026-08-16T21:06:51.089Z"
+    },
+    {
+      "id": "1786914411090_aqhmlen",
+      "paso": "Observación",
+      "detalle": "Disparado por: nuevo producto. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:06:51.090Z"
+    },
+    {
+      "id": "1786914411092_cmjjye7",
+      "paso": "Análisis",
+      "detalle": "7 productos activos analizados.",
+      "timestamp": "2026-08-16T21:06:51.092Z"
+    },
+    {
+      "id": "1786914411093_b4r417x",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:06:51.093Z"
+    },
+    {
+      "id": "1786914411094_n30u8xd",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:06:51.094Z"
+    },
+    {
+      "id": "1786914411105_k9ktr2p",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:06:51.105Z"
+    },
+    {
+      "id": "1786914411106_l4knhwp",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:06:51.106Z"
+    },
+    {
+      "id": "1786914419670_m9lhs01",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:06:59.670Z"
+    },
+    {
+      "id": "1786914419674_ralurtr",
+      "paso": "Análisis",
+      "detalle": "7 productos activos analizados.",
+      "timestamp": "2026-08-16T21:06:59.674Z"
+    },
+    {
+      "id": "1786914419674_cplb1wx",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:06:59.674Z"
+    },
+    {
+      "id": "1786914419680_t8bdq0s",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:06:59.680Z"
+    },
+    {
+      "id": "1786914419687_bcwpmln",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:06:59.687Z"
+    },
+    {
+      "id": "1786914419689_46dr9nx",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:06:59.689Z"
+    },
+    {
+      "id": "1786914479670_bf2dp4g",
+      "paso": "Observación",
+      "detalle": "Disparado por: chequeo periódico. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:07:59.670Z"
+    },
+    {
+      "id": "1786914479679_vyfoyv2",
+      "paso": "Análisis",
+      "detalle": "7 productos activos analizados.",
+      "timestamp": "2026-08-16T21:07:59.679Z"
+    },
+    {
+      "id": "1786914479683_83bxzbx",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:07:59.683Z"
+    },
+    {
+      "id": "1786914479686_1wkxrlh",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:07:59.686Z"
+    },
+    {
+      "id": "1786914479697_01ob2m9",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:07:59.697Z"
+    },
+    {
+      "id": "1786914479701_crtf4rt",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:07:59.701Z"
+    },
+    {
+      "id": "1786914493403_z7ntt0g",
+      "paso": "Observación",
+      "detalle": "Disparado por: carga de la app. Leyendo estado del inventario.",
+      "timestamp": "2026-08-16T21:08:13.403Z"
+    },
+    {
+      "id": "1786914493405_essb92v",
+      "paso": "Análisis",
+      "detalle": "7 productos activos analizados.",
+      "timestamp": "2026-08-16T21:08:13.405Z"
+    },
+    {
+      "id": "1786914493406_9qz94na",
+      "paso": "Análisis",
+      "detalle": "2 productos en riesgo (amarillo/rojo/vencido).",
+      "timestamp": "2026-08-16T21:08:13.406Z"
+    },
+    {
+      "id": "1786914493406_nea3rel",
+      "paso": "Planificación",
+      "detalle": "Consultando al Agente Cocinero por recetas que aprovechen los productos en riesgo.",
+      "timestamp": "2026-08-16T21:08:13.407Z"
+    },
+    {
+      "id": "1786914493423_u91eu7u",
+      "paso": "Planificación",
+      "detalle": "3 recetas sugeridas.",
+      "timestamp": "2026-08-16T21:08:13.423Z"
+    },
+    {
+      "id": "1786914493424_2733suw",
+      "paso": "Acción",
+      "detalle": "2 producto(s) en riesgo visibles en Alertas, con recetas asociadas cuando corresponde.",
+      "timestamp": "2026-08-16T21:08:13.424Z"
+    }
+  ],
+  "stylePreferences": {
+    "cocina": {},
+    "estilo": {},
+    "tipo": {}
+  },
+  "aiProviderConfig": {},
+  "learnedRecipes": [
+    {
+      "id": "gen_f6x38q6",
+      "name": "Arroz guisado con asado desmenuzado",
+      "ingredients": [
+        "carne",
+        "arroz",
+        "tomate",
+        "aceite",
+        "agua",
+        "sal",
+        "pimienta"
+      ],
+      "critical": [
+        "carne"
+      ],
+      "steps": [
+        "Cortar o desmenuzar el asado en bocados pequeños, retirando los huesos o excesos de grasa gruesa.",
+        "En una olla, calentar una cuchara de aceite a fuego medio y agregar el asado para que recupere temperatura y libere sus jugos.",
+        "Añadir el arroz a la olla y remover durante un minuto para tostado ligero con la grasa del asado.",
+        "Vertir el puré de tomate y agregar el doble de volumen de agua en relación al arroz. Condimentar con sal y pimienta al gusto.",
+        "Tapar y cocinar a fuego bajo durante 15 a 18 minutos hasta que el arroz esté cocido y el líquido se haya absorbido."
+      ],
+      "cookTimeMin": 25,
+      "servings": 2,
+      "tags": [],
+      "cocina": "argentina",
+      "estilo": "casera",
+      "tipo": "plato principal",
+      "generada": true,
+      "aprendidaEl": "2026-08-15T22:32:02.119Z"
+    },
+    {
+      "id": "gen_7m31o0k",
+      "name": "Milanesa a la Pomodoro con Arroz",
+      "ingredients": [
+        "carne",
+        "tomate",
+        "arroz",
+        "mayonesa hellmanns clasica",
+        "aceite",
+        "agua",
+        "sal",
+        "pimienta"
+      ],
+      "critical": [
+        "carne"
+      ],
+      "steps": [
+        "En una olla pequeña, cocinar el arroz en el doble de su volumen de agua hirviendo con una pizca de sal, a fuego bajo hasta que esté tierno.",
+        "En una sartén pequeña con un chorrito de aceite, calentar el puré de tomate condimentado con sal y pimienta a fuego bajo durante 5 minutos para formar una salsa.",
+        "En otra sartén con aceite caliente, freír la milanesa hasta que esté dorada y cocida de ambos lados.",
+        "Servir la milanesa cubierta con la salsa de tomate caliente, acompañada por el arroz blanco y una porción de mayonesa."
+      ],
+      "cookTimeMin": 20,
+      "servings": 1,
+      "tags": [],
+      "cocina": "argentina",
+      "estilo": "casera",
+      "tipo": "plato principal",
+      "generada": true,
+      "aprendidaEl": "2026-08-16T21:07:29.730Z"
+    }
+  ]
+}

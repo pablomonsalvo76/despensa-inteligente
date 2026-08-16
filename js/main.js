@@ -1775,7 +1775,12 @@ document.addEventListener('DOMContentLoaded', () => {
         despensa.innerHTML = c.desglose.completa
           ? `<strong>Ya tenés todo.</strong> ${escapeHtml(frase.replace(' No te falta nada.', ''))}`
           : escapeHtml(frase) +
-            ` <span class="rd-falta">Te falta: ${escapeHtml(c.desglose.faltantes.join(', '))}.</span>`;
+            // Los ingredientes del recetario usan guion bajo como separador
+            // interno (`pan_rallado`). Eso es una clave, no un texto: al
+            // usuario se le muestra "pan rallado", como ya hace la lista de
+            // ingredientes y la de compras.
+            ` <span class="rd-falta">Te falta: ${escapeHtml(
+              c.desglose.faltantes.map((f) => String(f).replace(/_/g, ' ')).join(', '))}.</span>`;
       }
     }
 
@@ -2510,6 +2515,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Las recetas generadas en "Inventar una receta", para poder abrirlas por
+  // índice desde el botón de cada una.
+  let generadasCache = [];
+
   const btnGenCrear = find('gen-crear');
   if (btnGenCrear) {
     btnGenCrear.addEventListener('click', async () => {
@@ -2524,7 +2533,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       estado.innerHTML = `<div class="empty-state">Pensando una receta con lo que tenés…</div>`;
       try {
-        const res = await AgenteGenerador.generar(AgenteVencimientos.analyze());
+        const enriquecidos = AgenteVencimientos.analyze();
+        const res = await AgenteGenerador.generar(enriquecidos);
 
         if (!res.recetas.length) {
           // Se muestra POR QUÉ se rechazó, no un "no se pudo" opaco: que el
@@ -2534,16 +2544,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         estado.innerHTML = '';
-        salida.innerHTML = res.recetas.map((r) => `
+        generadasCache = res.recetas;
+        salida.innerHTML = res.recetas.map((r, i) => `
           <div class="list-row" style="align-items:flex-start">
             <div class="lr-info">
               <div class="lr-title">${escapeHtml(r.name)}</div>
-              <div class="lr-sub">${r.cookTimeMin} min · ${r.servings} porciones · usa ${escapeHtml(r.ingredients.join(', '))}</div>
+              <div class="lr-sub">${r.cookTimeMin} min · ${r.servings} porciones · usa ${escapeHtml(r.ingredients.map((x) => x.replace(/_/g, ' ')).join(', '))}</div>
             </div>
             <span class="badge verde">inventada</span>
           </div>
           <ol class="recipe-steps">${r.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+          <button class="btn btn-outline btn-block" data-gen-ver="${i}">Abrir receta — cociné o descarté</button>
         `).join('');
+
+        /* Sin esto la receta generada era un callejón sin salida: se leía y
+           no había forma de decir qué pasó con ella. Y el desenlace no es un
+           detalle de interfaz — es la ÚNICA entrada del Agente de
+           Aprendizaje. Una receta que no se puede marcar como cocinada o
+           descartada no enseña nada, así que el modelo podía proponer diez
+           platos y el sistema seguía sin saber nada del usuario.
+
+           Se reutiliza la pantalla de detalle de siempre, que ya tiene los
+           botones, la ilustración y el desglose de la despensa: la receta
+           inventada se trata igual que una del recetario, que es
+           exactamente lo que es una vez que pasó el validador. */
+        salida.querySelectorAll('[data-gen-ver]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const receta = generadasCache[Number(btn.dataset.genVer)];
+            if (receta) abrirRecetaCandidata(candidataDesdeGenerada(receta, [], enriquecidos));
+          });
+        });
 
         if (res.rechazadas && res.rechazadas.length) {
           const m = res.rechazadas.map((r) => escapeHtml(r.motivo)).join('; ');
