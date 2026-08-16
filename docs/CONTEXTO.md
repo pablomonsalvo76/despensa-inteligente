@@ -951,3 +951,50 @@ Anotado en la Sección 9 del informe y conectado con la Sección 8, donde
 "unidad y conversión" es el primer cambio necesario para gastronomía.
 
 sw `v49`.
+
+### Auditoría de la invariante de ingredientes — 2026-08-16
+
+**Observación del autor, correcta**: estos defectos los tendría que haber
+encontrado el análisis del proyecto, no él usando la app.
+
+**Por qué el análisis no los encontró.** Revisó cosas mecánicas —que todo
+compile, que el service worker cachee lo que `index.html` carga, que la app
+esté desplegada, tamaño del código, historia de commits—. Ninguna de esas
+encuentra una **invariante rota**. Al introducir `canonizar()` se creó una
+regla nueva del sistema ("un ingrediente de receta se compara con un
+producto SIEMPRE por ingrediente canónico") y no se auditó quién la cumplía.
+Se migraron Cocinero, Generador y Compras; quedaron afuera el Evaluador y el
+Conversacional.
+
+**Regla para la próxima**: cuando se introduce una invariante que cruza
+agentes, enumerar TODOS los puntos que la tocan y verificarlos uno por uno
+antes de dar el cambio por terminado. Migrar una familia de llamadas y dejar
+una afuera es peor que no migrar ninguna: el sistema queda internamente
+inconsistente y el síntoma aparece lejos del cambio.
+
+**Auditoría completa realizada** sobre los dos patrones (`normalizeName`
+sobre un nombre de producto, y `normalizeName` sobre un ingrediente de
+receta). Resultado: 18 puntos, 17 correctos por diseño (claves propias del
+índice, respaldos defensivos, comparaciones producto↔producto, tablas de
+propiedades del hogar) y **uno roto**: `conversacional.js`.
+
+### El chatbot emparejaba con `includes()` — 2026-08-16
+
+Peor que los anteriores, porque **este camino modifica el inventario**.
+Casos medidos con el emparejamiento viejo:
+
+| El usuario escribe | Producto en la despensa | Resultado |
+|---|---|---|
+| "usé la sal" | Salchicha | la marcaba consumida |
+| "tiré la leche" | Dulce de leche | lo marcaba descartado |
+| "usé el te" | Tomate | lo marcaba consumido |
+| "consumí la carne" | Milanesa | no la encontraba |
+
+Ahora usa `AgenteCocinero.buscarEnDespensa`, el mismo resolvedor del
+Cocinero, el Generador y el Evaluador: empareja por palabras completas y
+sólo como prefijo, así que "sal" no puede resolver a "salchicha" pero
+"mayonesa" sí resuelve a "Mayonesa Hellmann's Clásica".
+
+7 chequeos nuevos, incluidos los cuatro falsos positivos, el falso negativo
+y el control de que un producto inexistente avise en vez de tocar algo
+(347 en 8 suites). sw `v50`.

@@ -52,7 +52,7 @@ function nuevoContexto() {
   ['js/db.js', 'js/recipes.js',
    'js/agents/inventario.js', 'js/agents/vencimientos.js', 'js/agents/cocinero.js',
    'js/agents/evaluador.js', 'js/agents/aprendizaje.js', 'js/agents/hogar.js',
-   'js/agents/compras.js'
+   'js/agents/compras.js', 'js/agents/conversacional.js'
   ].forEach((f) => vm.runInContext(leer(f), sandbox, { filename: f }));
 
   // Los agentes se declaran con `const`, así que quedan en el ámbito léxico
@@ -60,7 +60,7 @@ function nuevoContexto() {
   vm.runInContext(`globalThis.__api = {
     DB, RECIPES, normalizeName,
     AgenteInventario, AgenteVencimientos, AgenteCocinero,
-    AgenteEvaluador, AgenteAprendizaje, AgenteHogar, AgenteCompras
+    AgenteEvaluador, AgenteAprendizaje, AgenteHogar, AgenteCompras, AgenteConversacional
   };`, sandbox);
 
   return sandbox.__api;
@@ -517,6 +517,72 @@ function chequear(desc, condicion, detalle) {
   const yogur = api2.AgenteInventario.getAll().find((p) => p.name === 'Yogur');
   chequear('no toca productos que la receta no usa',
     yogur && yogur.status === 'activo', `status=${yogur && yogur.status}`);
+}
+
+/* =======================================================================
+   EL CHATBOT MODIFICA EL INVENTARIO: no puede equivocarse de producto
+   -----------------------------------------------------------------------
+   Emparejaba con `includes()` en las dos direcciones. Como este camino
+   marca productos como consumidos o descartados, un match equivocado no
+   sólo confunde: corrompe el inventario, y sobre él se calculan las
+   alertas, las recetas y la lista de compras.
+   ===================================================================== */
+{
+  const enDias = (d) => new Date(HOY.getTime() + d * 86400000).toISOString().slice(0, 10);
+
+  // Cada caso arranca limpio: interpretar() tiene efectos sobre el inventario.
+  const conDespensa = (productos) => {
+    const api = nuevoContexto();
+    productos.forEach((p) => api.AgenteInventario.add({
+      name: p, category: 'otros', quantity: 1, expiryDate: enDias(10), location: 'Alacena'
+    }));
+    return api;
+  };
+  const estado = (api, nombre) => {
+    const p = api.AgenteInventario.getAll().find((x) => x.name === nombre);
+    return p ? p.status : '(no existe)';
+  };
+
+  // Los cuatro falsos positivos medidos, todos con `includes()`.
+  const trampas = [
+    ['Salchicha', 'usé la sal'],
+    ['Dulce de leche', 'tiré la leche'],
+    ['Tomate', 'usé el te'],
+    ['Yogur', 'consumí el yogurcito de ayer']
+  ];
+  trampas.forEach(([producto, frase]) => {
+    const api = conDespensa([producto]);
+    api.AgenteConversacional.interpretar(frase);
+    chequear(`REGRESIÓN: "${frase}" no toca "${producto}"`,
+      estado(api, producto) === 'activo', `quedó ${estado(api, producto)}`);
+  });
+
+  // Y el falso negativo: la receta dice carne, la despensa dice Milanesa.
+  {
+    const api = conDespensa(['Milanesa']);
+    api.AgenteConversacional.interpretar('consumí la carne');
+    chequear('REGRESIÓN: "consumí la carne" encuentra la Milanesa',
+      estado(api, 'Milanesa') === 'consumido', `quedó ${estado(api, 'Milanesa')}`);
+  }
+
+  // Lo que sí tiene que seguir funcionando: nombrar el producto propio,
+  // completo o por su primera palabra.
+  {
+    const api = conDespensa(["Mayonesa Hellmann's Clásica"]);
+    api.AgenteConversacional.interpretar('tiré la mayonesa');
+    chequear('nombrar el producto por su tipo sigue funcionando',
+      estado(api, "Mayonesa Hellmann's Clásica") === 'descartado',
+      `quedó ${estado(api, "Mayonesa Hellmann's Clásica")}`);
+  }
+
+  // Un producto que no existe se avisa, no se inventa.
+  {
+    const api = conDespensa(['Arroz']);
+    const r = api.AgenteConversacional.interpretar('tiré el pescado');
+    chequear('un producto inexistente devuelve aviso y no toca nada',
+      r && /no encontr/i.test(r.mensaje) && estado(api, 'Arroz') === 'activo',
+      JSON.stringify(r));
+  }
 }
 
 /* =======================================================================

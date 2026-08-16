@@ -174,13 +174,27 @@ const AgenteConversacional = (() => {
     // Grupos del regex de consumo: [1] = cantidad opcional, [2] = nombre
     const nombreCrudo = (consumo ? consumo[2] : descarte[1]).trim();
     const cantidad = consumo && consumo[1] ? Number(consumo[1]) : null;
-    const norm = normalizeName(nombreCrudo);
+    /* Busca el producto por INGREDIENTE, con el mismo resolvedor que usan el
+       Cocinero, el Generador y el Evaluador. Antes hacía `includes()` en las
+       dos direcciones, y eso acá es peligroso de verdad: este camino MODIFICA
+       el inventario. Casos medidos que resolvía mal:
 
-    // Busca el producto activo que coincida; si hay varios, el más urgente.
-    const candidatos = AgenteInventario.activos()
-      .filter((p) => normalizeName(p.name) === norm || normalizeName(p.name).includes(norm) || norm.includes(normalizeName(p.name)))
-      .sort((a, b) => AgenteVencimientos.daysRemaining(a.expiryDate) - AgenteVencimientos.daysRemaining(b.expiryDate));
-    const producto = candidatos[0];
+         "usé la sal"    -> marcaba consumida la Salchicha
+         "tiré la leche" -> marcaba descartado el Dulce de leche
+         "usé el te"     -> marcaba consumido el Tomate
+         "cociné carne"  -> no encontraba la Milanesa
+
+       `buscarEnDespensa` empareja por palabras completas y sólo como
+       prefijo, así que "sal" no puede resolver a "salchicha", pero
+       "mayonesa" sí resuelve a "Mayonesa Hellmann's Clásica" — que es lo
+       que el usuario espera cuando nombra un producto suyo. */
+    const activos = AgenteInventario.activos().map((p) => ({
+      ...p, daysRemaining: AgenteVencimientos.daysRemaining(p.expiryDate)
+    }));
+    const producto = typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.buscarEnDespensa(nombreCrudo,
+          AgenteCocinero.inventarioPorIngrediente(AgenteCocinero.inventarioDisponible(activos)))
+      : activos.find((p) => normalizeName(p.name) === normalizeName(nombreCrudo));
 
     if (!producto) {
       return { tipo: 'accion', mensaje: `No encontré "${nombreCrudo}" entre tus productos activos. Fijate el nombre exacto en Mis productos.` };
