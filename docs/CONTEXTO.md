@@ -879,3 +879,31 @@ aviso "Te falta:" — es una clave interna, no un texto para el usuario.
 Apareció en una de las capturas de la entrega.
 
 sw `v47`.
+
+### El panel de la receta inventada no se enteraba del desenlace — 2026-08-16
+
+Dos observaciones del autor sobre el botón agregado hace un rato, las dos
+correctas:
+
+**1. La etiqueta.** Decía *"Abrir receta — cociné o descarté"*. Se escribió
+así para ser explicativa y terminó siendo un cartel: larga, con un guion en
+el medio y fuera del tono del resto de la app, donde los botones dicen
+"Ver receta", "Guardar producto", "Detener". Queda **"Abrir receta"**. Lo
+que pasa adentro se descubre adentro; el botón sólo tiene que decir a dónde
+lleva.
+
+**2. Después de marcarla como cocinada, seguía en pantalla.** El panel
+"Inventar una receta" es HTML estático que nadie vuelve a dibujar: al
+volver de la pantalla de detalle, la receta seguía ahí intacta y el usuario
+no tenía forma de saber si el desenlace se había registrado. Nuevo
+`cerrarPanelGenerada(receta, confirmacion)`, llamado desde `rd-cook` y
+`rd-dismiss`: limpia el panel y deja la confirmación en su lugar.
+
+Sólo limpia **si la receta cerrada es la que estaba en el panel**. Marcar
+una receta del recetario no tiene por qué borrar una propuesta del modelo
+que el usuario todavía no decidió.
+
+La receta no se pierde al limpiarse: quedó incorporada al catálogo (ver
+"El recetario deja de ser fijo") y vuelve a aparecer entre las sugerencias.
+
+sw `v48`.

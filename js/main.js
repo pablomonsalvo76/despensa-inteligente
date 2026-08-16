@@ -1841,6 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!recetaAbierta) return;
     AgenteEvaluador.registrarDesenlace({ productId: null, recipeId: recetaAbierta.receta.id, outcome: 'cocinado' });
     toast('¡Buen provecho! Registrado como cocinado.');
+    cerrarPanelGenerada(recetaAbierta.receta, 'Cocinada. Los ingredientes se descontaron de tu despensa.');
     historial.pop();
     ir('sc-recetas', { push: false });
   });
@@ -1866,9 +1867,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     toast(mensaje);
+    cerrarPanelGenerada(descartada, 'Descartada. No te la vuelvo a sugerir.');
     historial.pop();
     ir('sc-recetas', { push: false });
   });
+
+  /* Al volver de marcar el desenlace, el panel "Inventar una receta" seguía
+     mostrando la receta como si no hubiera pasado nada: el usuario cocinaba,
+     volvía, y la veía ahí intacta sin saber si se había registrado. El panel
+     es HTML estático que nadie vuelve a dibujar, así que hay que limpiarlo a
+     mano y confirmar en su lugar.
+
+     Sólo se limpia si la receta cerrada es la que estaba en el panel: marcar
+     una receta del recetario no tiene por qué borrar una propuesta del
+     modelo que el usuario todavía no decidió. */
+  function cerrarPanelGenerada(receta, confirmacion) {
+    if (!receta || !generadasCache.some((r) => r.id === receta.id)) return;
+    generadasCache = [];
+    const salida = find('gen-resultado');
+    const estado = find('gen-estado');
+    if (salida) salida.innerHTML = '';
+    // La receta no se pierde: quedó incorporada al recetario y vuelve a
+    // aparecer en las sugerencias de siempre.
+    if (estado) estado.innerHTML = `<div class="empty-state">${escapeHtml(confirmacion)}</div>`;
+  }
 
   /* =========================================================================
      9. CALENDARIO
@@ -2554,7 +2576,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="badge verde">inventada</span>
           </div>
           <ol class="recipe-steps">${r.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
-          <button class="btn btn-outline btn-block" data-gen-ver="${i}">Abrir receta — cociné o descarté</button>
+          <button class="btn btn-outline btn-block" data-gen-ver="${i}">Abrir receta</button>
         `).join('');
 
         /* Sin esto la receta generada era un callejón sin salida: se leía y
