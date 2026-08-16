@@ -43,6 +43,10 @@ function nuevoContexto() {
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
+  // Los agentes avisan al orquestador cuando cambian el inventario. Acá sólo
+  // hace falta que exista para no romper: lo que se prueba es el efecto sobre
+  // los datos, no la notificación.
+  sandbox.Orquestador = { notifyEvent: noop, log: noop };
   vm.createContext(sandbox);
 
   ['js/db.js', 'js/recipes.js',
@@ -462,6 +466,57 @@ function chequear(desc, condicion, detalle) {
   chequear('REGRESIÓN: no te manda a comprar carne teniendo una milanesa',
     !compras.some((c) => c.ingrediente === 'carne'),
     JSON.stringify(compras.map((c) => c.ingrediente)));
+}
+
+/* =======================================================================
+   COCINAR DESCUENTA DEL INVENTARIO — por ingrediente, no por nombre
+   -----------------------------------------------------------------------
+   Reportado: se marca una receta como cocinada y el producto sigue en la
+   despensa. El descuento comparaba `normalizeName(producto.name)` contra
+   el ingrediente de la receta: con "Milanesa" en el freezer y `carne` en
+   la receta, no encontraba nada y no descontaba.
+
+   Es lo más grave de esta familia de defectos: si el inventario miente,
+   mienten también las alertas, las recetas y la lista de compras, porque
+   todas se calculan sobre él.
+   ===================================================================== */
+{
+  const api = nuevoContexto();
+  const { AgenteInventario, AgenteEvaluador, DB } = api;
+
+  const enDias = (d) => new Date(HOY.getTime() + d * 86400000).toISOString().slice(0, 10);
+
+  // r08 "Milanesas con puré" = carne, pan_rallado, huevo, papa, leche.
+  AgenteInventario.add({ name: 'Milanesa', category: 'carnes', quantity: 1, expiryDate: enDias(2), location: 'Freezer' });
+  AgenteInventario.add({ name: 'Papa', category: 'verduras', quantity: 3, expiryDate: enDias(20), location: 'Alacena' });
+
+  const antes = AgenteInventario.activos().length;
+  chequear('los dos productos entran activos', antes === 2, `activos=${antes}`);
+
+  AgenteEvaluador.registrarDesenlace({ productId: null, recipeId: 'r08', outcome: 'cocinado' });
+
+  const activos = AgenteInventario.activos();
+  const milanesa = AgenteInventario.getAll().find((p) => p.name === 'Milanesa');
+  const papa = activos.find((p) => p.name === 'Papa');
+
+  chequear('REGRESIÓN: la milanesa se consume aunque la receta diga "carne"',
+    milanesa && milanesa.status === 'consumido', `status=${milanesa && milanesa.status}`);
+  chequear('un producto con stock se descuenta en vez de consumirse',
+    papa && papa.quantity === 2, `cantidad=${papa && papa.quantity}`);
+
+  // El desenlace registra qué se descontó, para el historial y el aprendizaje.
+  const ultimo = DB.get('history', []).slice(-1)[0];
+  chequear('el desenlace deja constancia de lo descontado',
+    ultimo && (ultimo.ingredientesUsados || []).length === 2,
+    JSON.stringify(ultimo && ultimo.ingredientesUsados));
+
+  // Lo que NO tiene que pasar: descontar algo que la receta no usa.
+  const api2 = nuevoContexto();
+  api2.AgenteInventario.add({ name: 'Yogur', category: 'lacteos', quantity: 1, expiryDate: enDias(5), location: 'Heladera' });
+  api2.AgenteEvaluador.registrarDesenlace({ productId: null, recipeId: 'r08', outcome: 'cocinado' });
+  const yogur = api2.AgenteInventario.getAll().find((p) => p.name === 'Yogur');
+  chequear('no toca productos que la receta no usa',
+    yogur && yogur.status === 'activo', `status=${yogur && yogur.status}`);
 }
 
 /* =======================================================================

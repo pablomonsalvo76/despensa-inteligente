@@ -907,3 +907,47 @@ La receta no se pierde al limpiarse: quedó incorporada al catálogo (ver
 "El recetario deja de ser fijo") y vuelve a aparecer entre las sugerencias.
 
 sw `v48`.
+
+### Cocinar no descontaba nada del inventario — 2026-08-16
+
+**Reportado por el autor**: se marca una receta como cocinada y el producto
+sigue en la despensa.
+
+**Causa — y es un error introducido por mí el día anterior.** Al migrar los
+agentes a la capa de ingrediente canónico se corrigieron el Cocinero, el
+Generador y la lista de compras. En `evaluador.js` se cambió la búsqueda de
+la receta (`RECIPES.find` → `buscarReceta`) pero **no se revisó el matcheo
+interno**, que seguía comparando nombres literales:
+
+```js
+const norm = normalizeName(ing);              // 'carne'
+activos.filter((p) => normalizeName(p.name) === norm)   // 'milanesa'
+```
+
+Con "Milanesa" en el freezer y `carne` en la receta no encontraba nada y no
+descontaba. Migrar una familia de llamadas y dejar una afuera es peor que no
+migrar ninguna: el sistema queda internamente inconsistente y el síntoma
+aparece lejos del cambio.
+
+**Por qué es el más grave de esta familia de defectos**: si el inventario
+miente, mienten también las alertas, las recetas y la lista de compras,
+porque todas se calculan sobre él. El README ya lo decía para otro caso —
+*"Eliminar ≠ descartar. Si el inventario miente, todas las decisiones
+posteriores son malas"*.
+
+**Solución**: `descontarIngredientesDeReceta` resuelve con
+`AgenteCocinero.buscarEnDespensa` sobre `inventarioPorIngrediente`, que
+además conserva el criterio de consumir el más urgente entre productos
+equivalentes. Se agregó un `Set` de ids ya descontados para que un mismo
+producto no se descuente dos veces si dos ingredientes resuelven a él.
+
+5 chequeos nuevos, incluida la regresión con Milanesa + `carne` y el control
+de que no se toque un producto que la receta no usa (340 en 8 suites).
+
+**Limitación que quedó documentada, no resuelta**: el inventario cuenta
+unidades enteras. Para un paquete de fideos está bien; para la carne no,
+que se consume por kilo. Medio kilo usado descuenta el producto entero.
+Anotado en la Sección 9 del informe y conectado con la Sección 8, donde
+"unidad y conversión" es el primer cambio necesario para gastronomía.
+
+sw `v49`.

@@ -33,14 +33,33 @@ const AgenteEvaluador = (() => {
     const consumidos = [];   // pasaron a estado consumido (cantidad llegó a 0)
     const descontados = [];  // se les restó 1 pero les queda stock
 
+    /* Los productos se resuelven por INGREDIENTE, no por nombre exacto. La
+       receta dice `carne` y en el freezer dice "Milanesa": comparando texto,
+       cocinar no descontaba NADA y el inventario quedaba mintiendo, que es lo
+       peor que le puede pasar a esta app — todas las decisiones posteriores
+       (alertas, recetas, compras) se calculan sobre él.
+
+       Es el mismo defecto que ya se había corregido en el Cocinero, el
+       Generador y la lista de compras; el Evaluador quedó afuera de esa
+       migración. `inventarioDisponible` además conserva el criterio de
+       consumir el más urgente ante productos equivalentes. */
+    const conDias = activos.map((p) => ({
+      ...p, daysRemaining: AgenteVencimientos.daysRemaining(p.expiryDate)
+    }));
+    const porIngrediente = typeof AgenteCocinero !== 'undefined'
+      ? AgenteCocinero.inventarioPorIngrediente(AgenteCocinero.inventarioDisponible(conDias))
+      : new Map(conDias.map((p) => [normalizeName(p.name), p]));
+
+    // Un mismo producto no se descuenta dos veces aunque dos ingredientes de
+    // la receta terminen resolviendo a él.
+    const yaDescontado = new Set();
+
     receta.ingredients.forEach((ing) => {
-      const norm = normalizeName(ing);
-      // Si hay más de un producto con el mismo nombre, consume el más urgente
-      const candidatos = activos
-        .filter((p) => normalizeName(p.name) === norm)
-        .sort((a, b) => AgenteVencimientos.daysRemaining(a.expiryDate) - AgenteVencimientos.daysRemaining(b.expiryDate));
-      const producto = candidatos[0];
-      if (!producto) return;
+      const producto = typeof AgenteCocinero !== 'undefined'
+        ? AgenteCocinero.buscarEnDespensa(ing, porIngrediente)
+        : porIngrediente.get(normalizeName(ing));
+      if (!producto || yaDescontado.has(producto.id)) return;
+      yaDescontado.add(producto.id);
 
       if (producto.quantity > 1) {
         // silencioso: el ciclo se dispara UNA vez al final del desenlace,

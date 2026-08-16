@@ -362,6 +362,14 @@ la capa generativa **no** tiene este problema: al modelo se le entrega el
 nombre real del producto, así que sabe qué es un asado. Es la demostración
 concreta de por qué existen las dos capas.
 
+**El inventario cuenta unidades, no peso.** Cada producto tiene una cantidad
+entera, y cocinar una receta descuenta una unidad. Para un paquete de fideos o
+un sachet de leche eso es correcto; para la carne no, porque se compra y se
+consume por kilo. La consecuencia práctica es que medio kilo de carne usado en
+una receta descuenta el producto entero. Es la misma carencia que la Sección 8
+nombra como primer cambio necesario para gastronomía —unidad y conversión en
+el modelo de datos— y aparece también en el caso doméstico.
+
 **Persistencia local.** `localStorage` vive en un dispositivo: no se comparte
 entre teléfonos y se pierde si se borran los datos del navegador. Está
 mitigado con exportar/importar. Fue una decisión consciente por privacidad de

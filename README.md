@@ -132,14 +132,14 @@ las decisiones posteriores son malas.
 
 ## Verificación
 
-Ocho suites, **335 pruebas**, sin dependencias externas:
+Ocho suites, **340 pruebas**, sin dependencias externas:
 
 ```bash
 node tests/fechas.test.js         # 55 — parseo de fechas de envase y OCR
 node tests/nombre.test.js         # 41 — nombre del producto: OCR local e identificación por IA
 node tests/preprocesado.test.js   # 19 — recorte, binarización y contraste de la imagen
 node tests/escaneo.test.js        # 36 — escaneo continuo (código + fecha + nombre)
-node tests/recomendacion.test.js  # 58 — ranking de recetas, equivalencia de ingredientes y aprendizaje
+node tests/recomendacion.test.js  # 63 — ranking de recetas, equivalencia de ingredientes y aprendizaje
 node tests/estilo.test.js         # 19 — aprendizaje de gusto y exploración
 node tests/generacion.test.js     # 75 — veto determinístico sobre el LLM y recetario que crece
 node tests/aiProvider.test.js     # 32 — proveedor de IA compartido, visión y traducción de errores
