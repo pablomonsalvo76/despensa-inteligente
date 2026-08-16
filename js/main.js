@@ -223,6 +223,16 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-add-inline').addEventListener('click', () => abrirAgregar());
   $('hdr-bell').addEventListener('click', () => ir('sc-alertas'));
   $('card-vencer').addEventListener('click', () => ir('sc-alertas'));
+
+  // La tarjeta de vencidos abre Alertas YA en la pestaña correcta. Mandarlo a
+  // "Próximos" y que tenga que encontrar la otra solapa sería pedirle trabajo
+  // justo cuando la app le acaba de decir que hay algo urgente.
+  const cardVencidosBtn = find('card-vencidos');
+  if (cardVencidosBtn) {
+    cardVencidosBtn.addEventListener('click', () => {
+      abrirAlertas('vencidos');
+    });
+  }
   $('card-recetas').addEventListener('click', () => { historial.length = 0; ir('sc-recetas', { push: false }); });
 
   document.querySelectorAll('[data-go]').forEach((btn) => {
@@ -302,6 +312,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('fc-vencer-n').textContent = `${proximos.length} producto${proximos.length === 1 ? '' : 's'}`;
     $('fc-vencer-dias').textContent = umbral;
+
+    /* Los vencidos NO entran en la tarjeta de arriba —esa promete "en los
+       próximos N días" y un vencido ya pasó— pero tampoco pueden quedar sin
+       señal en la pantalla principal, que era lo que pasaba: había que
+       entrar a Alertas para enterarse, y nada te decía que entraras.
+
+       Es la única situación de la app que pide una acción inmediata. Un
+       producto vencido ya no se puede cocinar (la seguridad alimentaria lo
+       excluye del pool de ingredientes) así que lo único que queda es
+       descartarlo — y hasta que no se descarta, ensucia el inventario sobre
+       el que se calculan las alertas, las recetas y las compras. */
+    const vencidos = enriquecidos.filter((p) => p.urgencia === 'vencido');
+    const cardVencidos = find('card-vencidos');
+    if (cardVencidos) {
+      cardVencidos.hidden = vencidos.length === 0;
+      if (vencidos.length) {
+        $('fc-vencidos-n').textContent = `${vencidos.length} producto${vencidos.length === 1 ? '' : 's'}`;
+        $('fc-vencidos-art').innerHTML = `<svg viewBox="0 0 60 60" fill="none" aria-hidden="true">
+          <path d="M14 18h32l-3 30a4 4 0 0 1-4 3.6H21a4 4 0 0 1-4-3.6L14 18Z" stroke="var(--rojo)" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M10 18h40M24 18v-5a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v5" stroke="var(--rojo)" stroke-width="3" stroke-linecap="round"/>
+          <path d="M26 28v14M34 28v14" stroke="var(--rojo)" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+        </svg>`;
+      }
+    }
 
     const recetas = AgenteCocinero.suggestRecipes(enriquecidos);
     $('fc-recetas-n').textContent = `${recetas.length} receta${recetas.length === 1 ? '' : 's'}`;
@@ -1454,6 +1488,15 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAlertas();
     });
   });
+
+  /** Abre Alertas ya posicionado en una pestaña concreta. */
+  function abrirAlertas(tab) {
+    tabAlerta = tab;
+    document.querySelectorAll('[data-alert-tab]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.alertTab === tab);
+    });
+    ir('sc-alertas');
+  }
 
   $('tip-close').addEventListener('click', () => { $('tip-card').hidden = true; });
 

@@ -998,3 +998,34 @@ sólo como prefijo, así que "sal" no puede resolver a "salchicha" pero
 7 chequeos nuevos, incluidos los cuatro falsos positivos, el falso negativo
 y el control de que un producto inexistente avise en vez de tocar algo
 (347 en 8 suites). sw `v50`.
+
+### Los vencidos no tenían señal en la pantalla principal — 2026-08-16
+
+**Reportado por el autor**: con un producto vencido, Inicio no muestra nada
+en rojo.
+
+**Causa, y era una decisión a medias.** `renderDashboard` filtra
+deliberadamente `rojo` y `amarillo` para la tarjeta "Próximos a vencer",
+con un comentario que lo justifica: esa tarjeta promete *"en los próximos N
+días"* y un vencido ya pasó. El razonamiento del texto es correcto; el
+resultado no. Los vencidos quedaban **sin ninguna señal** en la pantalla
+principal: había que entrar a Alertas para enterarse, y nada te decía que
+entraras.
+
+Es exactamente al revés de lo que la app necesita. Un producto vencido es
+**la única situación que pide una acción inmediata**: ya no se puede
+cocinar —la regla de seguridad alimentaria lo excluye del pool de
+ingredientes— así que lo único que queda es descartarlo. Y hasta que no se
+descarta, ensucia el inventario sobre el que se calculan las alertas, las
+recetas y las compras.
+
+**Solución**: tarjeta propia `card-vencidos`, roja, **arriba** de "Próximos
+a vencer" y oculta cuando no hay nada vencido. No se mezcló con la tarjeta
+existente a propósito: hacerlo habría vuelto mentiroso su texto. Dos
+promesas distintas, dos tarjetas.
+
+La tarjeta abre Alertas **ya en la pestaña "vencidos"** (`abrirAlertas`).
+Mandarlo a "Próximos" y que tenga que encontrar la otra solapa sería
+pedirle trabajo justo cuando la app le acaba de decir que hay algo urgente.
+
+sw `v51`.

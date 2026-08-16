@@ -78,6 +78,20 @@
           <p>Este es el estado de tu despensa</p>
         </div>
 
+        <!-- Aviso de vencidos. Va ARRIBA de "Próximos a vencer" y sólo
+             aparece si hay algo vencido: es la única situación de la app que
+             pide una acción inmediata del usuario (descartar), y antes no
+             tenía ninguna señal en la pantalla principal. -->
+        <button class="feature-card feature-card--danger" id="card-vencidos" hidden>
+          <div class="fc-body">
+            <span class="fc-label">Ya vencidos</span>
+            <span class="fc-value" id="fc-vencidos-n">0 productos</span>
+            <span class="fc-note">no se pueden cocinar: descartalos</span>
+            <span class="fc-cta">Descartar ahora</span>
+          </div>
+          <div class="fc-art" id="fc-vencidos-art"></div>
+        </button>
+
         <button class="feature-card feature-card--warn" id="card-vencer">
           <div class="fc-body">
             <span class="fc-label">Próximos a vencer</span>
